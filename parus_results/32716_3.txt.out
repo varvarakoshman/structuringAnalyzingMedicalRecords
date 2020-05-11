@@ -1,0 +1,7 @@
+1	Последний	последний	A	A	Afpmsnf	2	опред
+2	приступ	приступ	N	N	Ncmsnn	0	ROOT
+3	в	в	S	S	Sp-l	0	ROOT
+4	апреле	#месяц	N	N	Ncmsln	3	предл
+5	2010	#год	M	M	Mc---d	6	опред
+6	года	год	N	N	Ncmsgn	4	атриб
+7	.	.	-	-	-	6	PUNC

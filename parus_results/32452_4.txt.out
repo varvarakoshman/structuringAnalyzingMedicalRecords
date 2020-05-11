@@ -1,0 +1,6 @@
+1	Последний	последний	A	A	Afpmsnf	2	опред
+2	пароксизм	пароксизм	N	N	Ncmsnn	0	ROOT
+3	ФП	фп	N	N	Ncmsnn	4	предик
+4	был	быть	V	V	Vmis-sma-p	0	ROOT
+5	19.09.10	#пдата	M	M	Mc---d	6	опред
+6	г	город	N	N	Ncmsgn	4	присвяз
