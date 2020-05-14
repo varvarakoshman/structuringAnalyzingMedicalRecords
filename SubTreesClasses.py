@@ -1,7 +1,8 @@
-import pandas as pd
-import numpy as np
 import os
 from collections import defaultdict
+
+import numpy as np
+import pandas as pd
 
 
 class Node:
@@ -41,15 +42,17 @@ class Tree:
         return list(filter(lambda x: x.node_to == to_id, self.edges))[0]
 
     def calculate_heights(self):
-        visited = np.full((len(self.nodes) + 1), False, dtype=bool)
-        self.heights = np.full((len(self.nodes) + 1), -1, dtype=int)  # all heights are -1 initially
+        visited = np.full(len(self.nodes), False, dtype=bool)
+        # visited = {i: False for i in list(map(lambda x: x.id, self.nodes))}
+        self.heights = np.full(len(self.nodes), -1, dtype=int)  # all heights are -1 initially
+        # heights = {i: -1 for i in list(map(lambda x: x.id, self.nodes))}
         stack = [0]  # push fictional root on top
         prev = None
         while len(stack) > 0:
             curr = stack[-1]
             if not visited[curr]:
                 visited[curr] = True
-            children = self.get_children(curr)
+            children = self.get_children(self.get_node(curr))
             if len(children) == 0:
                 self.heights[curr] = 0
                 prev = curr
@@ -66,35 +69,42 @@ class Tree:
                         for child in children:
                             if self.heights[child] > max_height:
                                 max_height = self.heights[child]
-                    curr_height = self.heights[prev] + 1
+                        curr_height = max_height + 1
+                    else:
+                        curr_height = self.heights[prev] + 1
                     self.heights[curr] = curr_height
                     prev = curr
                     stack.pop()
 
 
-# input: map_dict - {v.id: str value of mapped string}, upper_bound - int
+# input: map_dict - {v.id: str value of mapped string}
 # returns: sorted_res - {v.id: str value of mapped string} in sorted order
-def radix_sort(map_dict, upper_bound):
-    map_dict_rev = {val: key for key, val in map_dict.items()}
-    n_digits = max(list(map(lambda x: len(x), map_dict_rev.values())))  # max N of digits
-    numbers = map_dict_rev.keys()
-    b = numbers  # array for intermediate results
+def radix_sort(map_dict):
+    if len(map_dict) == 0:
+        return map_dict
+    map_dict_rev = defaultdict(list)  # reversed: {str value of mapped string: [v.id]}
+    for key, val in map_dict.items():
+        map_dict_rev[val].append(key)
+    n_digits = max(list(map(lambda x: len(x), map_dict_rev.keys())))  # max N of digits
+    numbers = list(map_dict_rev.keys())
+    b = numbers.copy()  # array for intermediate results
+    upper_bound = 10
     for i in range(n_digits):
-        c = np.zeros(upper_bound - 1)  # temp array
-        for j in range(len(numbers) - 1):
-            d = int(numbers[j][i])
-            c[d] += 1
+        c = np.zeros(upper_bound, dtype=int)  # temp array
+        for j in range(len(numbers)):
+            d = int(numbers[j]) // pow(10, i)
+            c[d % 10] += 1
         cnt = 0
-        for j in range(upper_bound - 1):
+        for j in range(upper_bound):
             tmp = c[j]
             c[j] = cnt
             cnt += tmp
-        for j in range(len(numbers) - 1):
-            d = int(numbers[j][i])
-            b[c[d]] = numbers[j]
-            c[d] += 1
-        numbers = b
-    sorted_res = {map_dict_rev[number]: number for number in numbers}
+        for j in range(len(numbers)):
+            d = int(numbers[j]) // pow(10, i)
+            b[c[d % 10]] = numbers[j]
+            c[d % 10] += 1
+        numbers = b.copy()
+    sorted_res = {list_item: number for number in numbers for list_item in map_dict_rev[number]}
     return sorted_res
 
 
@@ -119,10 +129,10 @@ def quick_sort(array):
 
 def remap_s(str_dict):
     m = 0
-    remapped = {}  # key : node id, value: mapped string
+    remapped = {key: "" for key in str_dict.keys()}  # key : node id, value: mapped string
     already_seen = {}
     for tpl in str_dict.items():
-        for char in range(len(tpl[1])):
+        for char in tpl[1]:
             if char in already_seen.keys():
                 mapping = already_seen[char]
             else:
@@ -169,21 +179,25 @@ trees_df_filtered = trees_df[trees_df.deprel != 'PUNC']
 trees_df_filtered = trees_df_filtered.reset_index(drop=True)
 trees_df_filtered.index = trees_df_filtered.index + 1
 
-trees_df_filtered.head()
+# trees_df_filtered.head()
+# TEST - тест на первых 3х предложениях
+trees_df_filtered = trees_df_filtered.head(40)
 
 # get all lemmas and create a dictionary to map to numbers
-dict_lemmas = {lemma: index for index, lemma in enumerate(set(trees_df_filtered['lemma'].to_list()))}
+dict_lemmas = {lemma: index for index, lemma in enumerate(set(trees_df_filtered['lemma'].to_list()), 1)}
 # get all relations and create a dictionary to map to numbers
 dict_rel = {rel: index for index, rel in enumerate(set(trees_df_filtered['deprel'].to_list()))}
 
 # construct a tree with a list of edges and a list of nodes
 whole_tree = Tree()
+root_node = Node(0, 0, None, None)  # add root
+Tree.add_node(whole_tree, root_node)
 for name, group in trees_df_filtered.groupby('sent_name'):
     row_ids = trees_df_filtered.index[trees_df_filtered.sent_name == name].to_list()
     # temporary dictionary for remapping indices
     temp_dict = {key: row_ids[ind] for ind, key in enumerate(group.id.to_list())}
-    temp_dict[0] = 0  # 0 is always a root
-    for row_index, row in group.iterrows():
+    temp_dict[0] = 0
+    for _, row in group.iterrows():
         new_id = temp_dict.get(row['id'])
         new_node = Node(new_id, dict_lemmas.get(row['lemma']), row['form'], row['sent_name'])
         Tree.add_node(whole_tree, new_node)
@@ -194,22 +208,24 @@ for name, group in trees_df_filtered.groupby('sent_name'):
 Tree.calculate_heights(whole_tree)
 
 heights_dictionary = {Tree.get_node(whole_tree, node_id): height for node_id, height in enumerate(whole_tree.heights)}
+
 grouped_heights = defaultdict(list)
-for key, value in sorted(heights_dictionary.items()):
+for key, value in heights_dictionary.items():
     grouped_heights[value].append(key)
+grouped_heights = sorted(grouped_heights.items(), key=lambda x: x[0])
 
 # compute subtree repeats
 reps = 0
 count = len(dict_lemmas.keys())
-r_classes = {}
-k = []  # identifiers of subtrees
-k_2 = []  # identifiers of edges of subtrees
+r_classes = np.full(len(whole_tree.nodes), -1, dtype=int)
+k = ["" for x in range(len(whole_tree.nodes))]  # identifiers of subtrees
+k_2 = ["" for x in range(len(whole_tree.nodes))]  # identifiers of edges of subtrees
 for i, nodes in enumerate(grouped_heights):
     # construct a string of numbers for each node v and its children
     s = {}  # key: node id, value: str(lemma id + ids of subtrees)
     w = {}  # key: node_id, value: str(weights of edges from current node to leaves)
     n_children = 0
-    for v in nodes:
+    for v in nodes[1]:
         children_v = Tree.get_children(whole_tree, v)
         s[v.id] = str(v.lemma)
         if len(children_v) > 0:
@@ -217,8 +233,8 @@ for i, nodes in enumerate(grouped_heights):
             w[v.id] += str(k_2[v.id])
             for child_id in children_v:
                 s[v.id] += str(k[child_id])
-        edge_to_curr = Tree.get_edge(whole_tree, v.lemma)
-        k_2[edge_to_curr.node_from] += edge_to_curr.weight + v.lemma
+        edge_to_curr = Tree.get_edge(whole_tree, v.id)
+        k_2[edge_to_curr.node_from] += str(edge_to_curr.weight) + str(v.lemma)
     # remap numbers from [1, |alphabet| + |T|) to [1, H[i] + #of children for each node]
     # needed for radix sort - to keep strings shorter
     remapped_nodes = remap_s(s)  # key: v.id, value: int array of remapped value
@@ -226,21 +242,29 @@ for i, nodes in enumerate(grouped_heights):
     # sort inside each string
     sorted_remapped_nodes = sort_strings_inside(remapped_nodes)  # {v.id: str value of mapped string}
     sorted_remapped_edges = sort_strings_inside(remapped_edges)  # {v.id: str value of mapped string}
-    upper_map_bound_n = len(nodes) + n_children
-    upper_map_bound_e = n_children
+    # upper_map_bound_n = len(nodes[1]) + n_children
+    # upper_map_bound_e = n_children
     # lexicographically sort the mapped strings with radix sort
-    sorted_strings = radix_sort(sorted_remapped_nodes, upper_map_bound_n)  # {v.id: str value of mapped string}
-    sorted_edges = radix_sort(sorted_remapped_edges, upper_map_bound_e)  # {v.id: str value of mapped string}
-    reps = reps + 1
-    k[nodes[0].id] = reps + count
+    sorted_strings = radix_sort(sorted_remapped_nodes)  # {v.id: str value of mapped string}
+    sorted_edges = radix_sort(sorted_remapped_edges)  # {v.id: str value of mapped string}
+    reps += 1
     # assign classes
-    for j, r in enumerate(sorted_strings, 1):
-        if r == sorted_strings[j - 1] and sorted_edges[j] == sorted_edges[j - 1]:
-            r_classes[reps] = r_classes[reps].append(sorted_strings[j])
+    sorted_vertices_id = list(sorted_strings.keys())
+    prev_vertex = sorted_vertices_id[0]
+    k[prev_vertex] = reps + count
+    for _, vertex in enumerate(sorted_vertices_id, 1):
+        if sorted_strings[vertex] == sorted_strings[prev_vertex] and len(sorted_edges) > 0 and sorted_edges[vertex] == \
+                sorted_edges[prev_vertex]:
+            r_classes[reps] = r_classes[reps].append(sorted_strings[vertex])
         else:
             reps += 1
-            r_classes[reps] = sorted_strings[j]
-        k[sorted_strings[j]] = reps + count
-        k_2[sorted_strings[j]] = reps + count
+            r_classes[reps] = sorted_strings[vertex]
+        k[vertex] = reps + count
+        k_2[vertex] = reps + count
+        prev_vertex = vertex
 
 trees_df_filtered.head()
+
+# show classes once finished with debug
+
+# TODO: implement search for overlapping repeats
