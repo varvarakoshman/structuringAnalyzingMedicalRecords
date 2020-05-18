@@ -39,7 +39,11 @@ class Tree:
         return list(map(lambda x: x.node_to, filter(lambda x: x.node_from == node.id, self.edges)))
 
     def get_edge(self, to_id):
-        return list(filter(lambda x: x.node_to == to_id, self.edges))[0]
+        optional_edge = list(filter(lambda x: x.node_to == to_id, self.edges))
+        if len(optional_edge) != 0:
+            return optional_edge[0]
+        else:
+            return None
 
     def calculate_heights(self):
         visited = np.full(len(self.nodes), False, dtype=bool)
@@ -181,12 +185,12 @@ trees_df_filtered.index = trees_df_filtered.index + 1
 
 # trees_df_filtered.head()
 # TEST - тест на первых 3х предложениях
-trees_df_filtered = trees_df_filtered.head(40)
+# trees_df_filtered = trees_df_filtered.head(40)
 
 # get all lemmas and create a dictionary to map to numbers
-dict_lemmas = {lemma: index for index, lemma in enumerate(set(trees_df_filtered['lemma'].to_list()), 1)}
+dict_lemmas = {lemma: index for index, lemma in enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
 # get all relations and create a dictionary to map to numbers
-dict_rel = {rel: index for index, rel in enumerate(set(trees_df_filtered['deprel'].to_list()))}
+dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
 
 # construct a tree with a list of edges and a list of nodes
 whole_tree = Tree()
@@ -217,13 +221,13 @@ grouped_heights = sorted(grouped_heights.items(), key=lambda x: x[0])
 # compute subtree repeats
 reps = 0
 count = len(dict_lemmas.keys())
-r_classes = np.full(len(whole_tree.nodes), -1, dtype=int)
+r_classes= [[] for _ in range(len(whole_tree.nodes))]
 k = ["" for x in range(len(whole_tree.nodes))]  # identifiers of subtrees
 k_2 = ["" for x in range(len(whole_tree.nodes))]  # identifiers of edges of subtrees
-for i, nodes in enumerate(grouped_heights):
+for nodes in grouped_heights:
     # construct a string of numbers for each node v and its children
     s = {}  # key: node id, value: str(lemma id + ids of subtrees)
-    w = {}  # key: node_id, value: str(weights of edges from current node to leaves)
+    w = {key: "" for key in list(map(lambda x: x.id, nodes[1]))}  # key: node_id, value: str(weights of edges from current node to leaves)
     n_children = 0
     for v in nodes[1]:
         children_v = Tree.get_children(whole_tree, v)
@@ -234,7 +238,8 @@ for i, nodes in enumerate(grouped_heights):
             for child_id in children_v:
                 s[v.id] += str(k[child_id])
         edge_to_curr = Tree.get_edge(whole_tree, v.id)
-        k_2[edge_to_curr.node_from] += str(edge_to_curr.weight) + str(v.lemma)
+        if edge_to_curr is not None:
+            k_2[edge_to_curr.node_from] += str(edge_to_curr.weight) + str(v.lemma)
     # remap numbers from [1, |alphabet| + |T|) to [1, H[i] + #of children for each node]
     # needed for radix sort - to keep strings shorter
     remapped_nodes = remap_s(s)  # key: v.id, value: int array of remapped value
@@ -252,19 +257,18 @@ for i, nodes in enumerate(grouped_heights):
     sorted_vertices_id = list(sorted_strings.keys())
     prev_vertex = sorted_vertices_id[0]
     k[prev_vertex] = reps + count
-    for _, vertex in enumerate(sorted_vertices_id, 1):
+    r_classes[reps].append(prev_vertex)
+    for ind in range(1, len(sorted_vertices_id)):
+        vertex = sorted_vertices_id[ind]
         if sorted_strings[vertex] == sorted_strings[prev_vertex] and len(sorted_edges) > 0 and sorted_edges[vertex] == \
                 sorted_edges[prev_vertex]:
-            r_classes[reps] = r_classes[reps].append(sorted_strings[vertex])
+            r_classes[reps].append(vertex)
         else:
             reps += 1
-            r_classes[reps] = sorted_strings[vertex]
+            r_classes[reps] = [vertex]
         k[vertex] = reps + count
-        k_2[vertex] = reps + count
         prev_vertex = vertex
 
 trees_df_filtered.head()
 
 # show classes once finished with debug
-
-# TODO: implement search for overlapping repeats
