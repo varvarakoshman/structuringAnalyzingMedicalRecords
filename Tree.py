@@ -2,7 +2,7 @@ import numpy as np
 
 
 class Node:
-    def __init__(self, id, lemma, form, sent_name):
+    def __init__(self, id, lemma, form=None, sent_name=None):
         self.id = id
         self.lemma = lemma
         self.form = form
