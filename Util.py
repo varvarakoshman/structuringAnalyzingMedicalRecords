@@ -98,7 +98,7 @@ def get_test_tree():
     Tree.add_node(test_tree, Node(8, 3, None, 2))
     Tree.add_node(test_tree, Node(9, 7, None, 2))
     Tree.add_node(test_tree, Node(10, 19, None, 2))
-    Tree.add_node(test_tree, Node(11, 19, None, 3))
+    Tree.add_node(test_tree, Node(11, 18, None, 3))
     Tree.add_node(test_tree, Node(12, 20, None, 3))
     Tree.add_node(test_tree, Node(13, 7, None, 3))
     Tree.add_node(test_tree, Node(14, 19, None, 3))
