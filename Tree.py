@@ -75,3 +75,29 @@ class Tree:
                     self.heights[curr] = curr_height
                     prev = curr
                     stack.pop()
+
+
+    def simple_dfs(self, vertex):
+        sequence = []
+        node = self.get_node(vertex)
+        sequence.append(tuple([vertex, node.form, node.sent_name]))
+        visited = np.full(len(self.nodes), False, dtype=bool)
+        stack = [vertex]
+        while len(stack) > 0:
+            curr = stack[-1]
+            if not visited[curr]:
+                visited[curr] = True
+            children = self.get_children(self.get_node(curr))
+            if len(children) == 0:
+                stack.pop()
+            else:
+                all_visited_flag = True
+                for child in children:
+                    if not visited[child]:
+                        all_visited_flag = False
+                        stack.append(child)
+                        node = self.get_node(child)
+                        sequence.append(tuple([child, node.form, node.sent_name]))
+                if all_visited_flag:
+                    stack.pop()
+        return sequence

@@ -6,6 +6,10 @@ import Util
 from Tree import Tree, Node, Edge
 from Util import radix_sort, sort_strings_inside, remap_s
 from itertools import combinations
+from gensim.models import Word2Vec
+from sklearn.manifold import TSNE
+import re
+import matplotlib.pyplot as plt
 
 
 def read_data():
@@ -42,6 +46,34 @@ def read_data():
     trees_df_filtered = trees_df_filtered.reset_index(drop=True)
     trees_df_filtered.index = trees_df_filtered.index + 1
     return trees_df_filtered
+
+
+def train_word2vec(trees_df_filtered, lemmas):
+    lemma_sent_df = trees_df_filtered[['lemma', 'sent_name']]
+    lemma_sent_dict = {}
+    for name, group in lemma_sent_df.groupby('sent_name'):
+        lemma_sent_dict[name] = []
+        for _, row in group.iterrows():
+            lemma_sent_dict[name].append(row['lemma'])
+    model = Word2Vec(list(lemma_sent_dict.values()), min_count=1)
+    similar_dict = {}
+    for lemma in lemmas:
+        similar_dict[lemma] = model.most_similar(lemma)
+    embeddings = [model[i] for i in lemmas]
+    # vocab = list(model.wv.vocab)
+    # X = model[vocab]
+    # tsne = TSNE(n_components=2)
+    # coordinates = tsne.fit_transform(X)
+    # df = pd.DataFrame(coordinates, index=vocab, columns=['x', 'y'])
+    # fig = plt.figure()
+    # ax = fig.add_subplot(1, 1, 1)
+    # ax.scatter(df['x'], df['y'])
+    # ax.set_xlim(right=200)
+    # ax.set_ylim(top=200)
+    # for word, pos in df.iterrows():
+    #     ax.annotate(word, pos)
+    # plt.show()
+
 
 
 def construct_tree(trees_df_filtered, dict_lemmas, dict_rel):
@@ -204,7 +236,8 @@ def remove_old_node(whole_tree, curr_node, grouped_heights, curr_height, k_2, le
     node_from = edge_to_curr.node_from
     whole_tree.edges.remove(edge_to_curr)
     whole_tree.nodes.remove(curr_node)
-    grouped_heights[curr_height][1].remove(curr_node)
+    if curr_node in grouped_heights[curr_height][1]:
+        grouped_heights[curr_height][1].remove(curr_node)
     del k_2[node_from]
 
     old_label = str(edge_to_curr.weight) + str(curr_node.lemma)
@@ -341,12 +374,13 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
 def main():
     trees_df_filtered = read_data()
     # TEST - тест на первых 3х предложениях
-    trees_df_filtered = trees_df_filtered.head(40)
+    trees_df_filtered = trees_df_filtered.head(341)
 
     # get all lemmas and create a dictionary to map to numbers
     dict_lemmas = {lemma: index for index, lemma in enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
     # get all relations and create a dictionary to map to numbers
     dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
+    # train_word2vec(trees_df_filtered, dict_lemmas)
 
     whole_tree = construct_tree(trees_df_filtered, dict_lemmas, dict_rel)
     # partition nodes by height
@@ -362,9 +396,17 @@ def main():
     # classes for full repeats
     # classes_full = compute_full_subtrees(whole_tree, len(dict_lemmas.keys()), grouped_heights)
     dict_lemmas_size = max(set(map(lambda x: x.lemma, whole_tree.nodes)))
-    whole_tree.get_node(32).lemma = 20
+    # whole_tree.get_node(32).lemma = 20
     classes_part = compute_part_subtrees(whole_tree, dict_lemmas_size, grouped_heights)
-
+    for k, v in classes_part.items():
+        vertex_seq = {}
+        for vertex in v:
+            vertex_seq[vertex] = Tree.simple_dfs(whole_tree, vertex)
+        filename = 'results/results_%s.txt' % (str(k))
+        with open(filename, 'w') as filehandle:
+            for key, value in vertex_seq.items():
+                filehandle.write("%s: %s\n" % (key, value))
+    oh_damn = {}
     # TEST
     # test_tree = Util.get_test_tree()
     # dict_lemmas_test_size = max(set(map(lambda x: x.lemma, test_tree.nodes)))
