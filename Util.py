@@ -15,7 +15,7 @@ def radix_sort(map_dict):
         map_dict_rev[val].append(key)
     n_digits = max(list(map(lambda x: len(x), map_dict_rev.keys())))  # max N of digits
     numbers = list(map_dict_rev.keys())
-    b = numbers.copy()  # array for intermediate results
+    b = numbers.copy()  # array for intermediate results_part
     upper_bound = 10
     for i in range(n_digits):
         c = np.zeros(upper_bound, dtype=int)  # temp array
