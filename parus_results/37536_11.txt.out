@@ -1,6 +1,0 @@
-1	2005	#год	M	M	Mc---d	2	опред
-2	год	год	N	N	Ncmsnn	0	ROOT
-3	–	-	-	-	-	2	PUNC
-4	операция	операция	N	N	Ncfsnn	2	аппоз
-5	MAZE	MAZE	-	-	-	4	аппоз
-6	.	.	-	-	-	5	PUNC

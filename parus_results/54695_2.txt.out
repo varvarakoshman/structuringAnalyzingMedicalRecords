@@ -1,8 +1,0 @@
-1	Перенес	перенести	V	V	Vmis-sma-p	0	ROOT
-2	гепатит	гепатит	N	N	Ncmsnn	1	предик
-3	А	а	C	C	C	0	ROOT
-4	в	в	S	S	Sp-l	0	ROOT
-5	возрасте	возраст	N	N	Ncmsln	4	предл
-6	7	#число	M	M	Mc---d	7	количест
-7	лет	год	N	N	Ncmpgn	5	компл-аппоз
-8	.	.	-	-	-	7	PUNC

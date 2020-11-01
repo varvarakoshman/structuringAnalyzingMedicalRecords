@@ -11,7 +11,7 @@ from Util import radix_sort, sort_strings_inside, remap_s
 
 
 def read_data():
-    DATA_PATH = r'parus_results'
+    DATA_PATH = r'medicalTextTrees/parus_results'
     files = os.listdir(DATA_PATH)
     trees_df = pd.DataFrame(columns=['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel'])
 
@@ -231,8 +231,12 @@ def classify_existing_node(curr_node, unique_subtrees_mapped, classes_subtreeid_
 def remove_old_node(whole_tree, curr_node, grouped_heights, curr_height, k_2, lemma_nodeid_dict):
     edge_to_curr = Tree.get_edge(whole_tree, curr_node.id)
     node_from = edge_to_curr.node_from
-    whole_tree.edges.remove(edge_to_curr)
-    whole_tree.nodes.remove(curr_node)
+    try:
+        whole_tree.edges.remove(edge_to_curr)
+        whole_tree.nodes.remove(curr_node)
+    except ValueError as e:
+        print(e)
+        pass
     if curr_node in grouped_heights[curr_height][1]:
         grouped_heights[curr_height][1].remove(curr_node)
     del k_2[node_from]
@@ -387,7 +391,7 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
 def main():
     trees_df_filtered = read_data()
     # TEST - тест на первых 3х предложениях
-    trees_df_filtered = trees_df_filtered.head(5015)  # 341 - all? 48 - 3 # 3884
+    trees_df_filtered = trees_df_filtered.head(48)  # 341 - all? 48 - 3 # 3884
     # trees_df_filtered = trees_df_filtered[trees_df_filtered.sent_name == '48554_5']
 
     # get all lemmas and create a dictionary to map to numbers
@@ -405,26 +409,35 @@ def main():
     Tree.calculate_heights(whole_tree)
     print('Time on calculating all heights: ' + str(time.time() - start))
 
-    heights_dictionary = {Tree.get_node(whole_tree, node_id): height for node_id, height in
-                          enumerate(whole_tree.heights)}
+    heights_dictionary = {Tree.get_node(whole_tree, node_id): heights for node_id, heights in
+                          whole_tree.heights.items()}
     grouped_heights = defaultdict(list)
-    for key, value in heights_dictionary.items():
-        grouped_heights[value].append(key)
+    for node, heights in heights_dictionary.items():
+        for height in heights:
+            grouped_heights[height].append(node)
     grouped_heights = sorted(grouped_heights.items(), key=lambda x: x[0])
+
+    # heights_dictionary = {Tree.get_node(whole_tree, node_id): height for node_id, height in
+    #                       enumerate(whole_tree.heights)}
+    # grouped_heights = defaultdict(list)
+    # for key, value in heights_dictionary.items():
+    #     grouped_heights[value].append(key)
+    # grouped_heights = sorted(grouped_heights.items(), key=lambda x: x[0])
 
     # classes for full repeats
     start = time.time()
-    classes_full = compute_full_subtrees(whole_tree, len(dict_lemmas.keys()), grouped_heights)
-    print('Time on calculating full repeats: ' + str(time.time() - start))
-    for index, listt in enumerate(classes_full):
-        vertex_seq = {}
-        for vertex in listt:
-            vertex_seq[vertex] = Tree.simple_dfs(whole_tree, vertex)
-        # if len(vertex_seq.items()) > 0:
-        filename = 'results_full/results_%s.txt' % (str(index))
-        with open(filename, 'w') as filehandle:
-            for key, value in vertex_seq.items():
-                filehandle.write("%s: %s\n" % (key, value))
+    # classes_full = compute_full_subtrees(whole_tree, len(dict_lemmas.keys()), grouped_heights)
+    # print('Time on calculating full repeats: ' + str(time.time() - start))
+    # for index, listt in enumerate(classes_full):
+    #     vertex_seq = {}
+    #     for vertex in listt:
+    #         vertex_seq[vertex] = Tree.simple_dfs(whole_tree, vertex)
+    #     # if len(vertex_seq.items()) > 0:
+    #     filename = 'results_full/results_%s.txt' % (str(index))
+    #     with open(filename, 'w') as filehandle:
+    #         for key, value in vertex_seq.items():
+    #             filehandle.write("%s: %s\n" % (key, value))
+
     dict_lemmas_size = max(set(map(lambda x: x.lemma, whole_tree.nodes)))
 
     # classes for partial repeats

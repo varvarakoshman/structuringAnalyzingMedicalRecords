@@ -1,7 +1,0 @@
-1	С	с	S	S	Sp-l	5	вводн
-2	2002	#год	M	M	Mc---d	3	опред
-3	г	г	N	N	Ncmsnnl	1	предл
-4	Сахарный	сахарный	A	A	Afpmsnf	5	опред
-5	диабет	диабет	N	N	Ncmsnn	0	ROOT
-6	II	ii	M	M	Mo---d	5	опред
-7	типа	тип	N	N	Ncmsgn	6	атриб

@@ -1,7 +1,0 @@
-1	Инвалид	инвалид	N	N	Ncmsny	0	ROOT
-2	II	ii	M	M	Mo---d	3	опред
-3	группы	группа	N	N	Ncfsgn	1	атриб
-4	с	с	S	S	Sp-g	1	атриб
-5	декабря	#месяц	N	N	Ncmsgn	4	предл
-6	2009	#год	M	M	Mc---d	7	опред
-7	г	город	N	N	Ncmsgn	5	атриб
