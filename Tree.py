@@ -4,11 +4,12 @@ import itertools
 
 
 class Node:
-    def __init__(self, id, lemma, form=None, sent_name=None):
+    def __init__(self, id, lemma, form=None, sent_name=None, is_included=False):
         self.id = id
         self.lemma = lemma
         self.form = form
         self.sent_name = sent_name
+        self.is_included = is_included
 
 
 class Edge:

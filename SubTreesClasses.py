@@ -7,7 +7,7 @@ import pandas as pd
 from gensim.models import Word2Vec
 
 from Tree import Tree, Node, Edge
-from Util import radix_sort, sort_strings_inside, remap_s
+from Util import radix_sort, sort_strings_inside, remap_s, new_test
 
 
 def read_data():
@@ -145,19 +145,36 @@ def compute_full_subtrees(whole_tree, count, grouped_heights):
     return r_classes
 
 
-def contained_in_others(curr, dict_nodeid_comb):
-    containing_only = {k: v for k, v in dict_nodeid_comb if any(elem in l for elem in curr for l in v)}
-    dict_nodeid_comb_filtered = {k: list(filter(lambda x: len(x) == len(curr) + 1, v)) for k, v in
-                                 containing_only.items()}
-    boolean_is_contained = [any(elem in l for elem in curr for l in v) for _, v in dict_nodeid_comb_filtered.items()]
-    return all(elem == True for elem in boolean_is_contained)
+def add_children_to_parents(k_2, grouped_lemmas, whole_tree, curr_height):
+    all_parents = []
+    for k, v in grouped_lemmas.items():
+        for v_id in list(v):
+            edge_to_curr = Tree.get_edge(whole_tree, v_id)
+            Tree.get_node(whole_tree, v_id).is_included = True
+            if edge_to_curr is not None:
+                label_for_child = str(edge_to_curr.weight) + str(k)
+                parent = edge_to_curr.node_from
+                if max(whole_tree.heights[parent]) > curr_height:
+                    all_parents.append(parent)
+                if parent not in k_2.keys():
+                    k_2[parent] = {label_for_child}
+                else:
+                    k_2[parent].add(label_for_child)
+    all_parents = set(all_parents)
+    for parent in all_parents:
+        for child_id in Tree.get_children(whole_tree, parent):
+            edge_to_curr = Tree.get_edge(whole_tree, child_id)
+            child_node = Tree.get_node(whole_tree, child_id)
+            if not child_node.is_included:
+                k_2[parent].add(str(edge_to_curr.weight) + str(child_node.lemma))
+                child_node.is_included = True
 
 
 # update a label of a subtree with edge weight + a lemma of the last node
-def insert_children_labels_to_parents(k_2, dict, tree):
-    for k, v in dict.items():
+def insert_children_labels_to_parents(k_2, grouped_lemmas, whole_tree):
+    for k, v in grouped_lemmas.items():
         for v_id in list(v):
-            edge_to_curr = Tree.get_edge(tree, v_id)
+            edge_to_curr = Tree.get_edge(whole_tree, v_id)
             if edge_to_curr is not None:
                 label_for_child = str(edge_to_curr.weight) + str(k)
                 if edge_to_curr.node_from not in k_2.keys():
@@ -170,7 +187,7 @@ def insert_nodeid_label_dict(lemma_nodeid_dict, whole_tree, v_id, curr_lemma):
     edge_to_curr = Tree.get_edge(whole_tree, v_id)
     if edge_to_curr is not None:
         label_for_child = str(edge_to_curr.weight) + str(curr_lemma)
-        tup_id_sent = tuple([v_id, whole_tree.get_node(v_id).sent_name])
+        tup_id_sent = tuple([v_id, whole_tree.get_node(v_id).sent_name]) #????????????
         if label_for_child not in lemma_nodeid_dict.keys():
             lemma_nodeid_dict[label_for_child] = [tup_id_sent]
         else:
@@ -183,10 +200,10 @@ def produce_combinations(k_2, v_id, lemma_nodeid_dict_local):
                                 for tup in comb]
     all_combinations_str_joined = []
     for combs in all_combinations_str_arr:
-        joined_label = ''.join(combs)
+        joined_label = ''.join(sorted(combs))
         lemma_nodeid_dict_local[joined_label] = combs
         all_combinations_str_joined.append(joined_label)
-    all_combinations_str_joined = [''.join(comb) for comb in all_combinations_str_arr]
+    all_combinations_str_joined = [''.join(sorted(comb)) for comb in all_combinations_str_arr]
     return all_combinations_str_joined
 
 
@@ -201,19 +218,12 @@ def get_nodeid_repeats(filtered_combination_ids, lemma_nodeid_dict_local):
     return dict_nodeid_comb
 
 
-def remove_duplicate_subtree_repeats(dict_nodeid_comb):
-    for node_id, combs in dict_nodeid_comb.items():
-        for curr in combs:
-            if contained_in_others(curr, dict_nodeid_comb.items()):
-                for _, v in dict_nodeid_comb.items():
-                    if curr in v:
-                        v.remove(curr)
-
-
 def get_unique_subtrees_mapped(dict_nodeid_comb, lemma_count):
     unique_subtrees = set(tuple(x) for x in [sublist for list in list(dict_nodeid_comb.values()) for sublist in list])
     unique_subtrees_mapped = {}
+    # existing_combinations = all_unique_subtrees.keys()
     for subtree in unique_subtrees:
+        # if subtree not in existing_combinations:
         lemma_count += 1
         unique_subtrees_mapped[subtree] = lemma_count
     return unique_subtrees_mapped, lemma_count
@@ -245,6 +255,18 @@ def remove_old_node(whole_tree, curr_node, grouped_heights, curr_height, k_2, le
     old_node_id = curr_node.id
     nodes_with_old_label = lemma_nodeid_dict.get(old_label)
     return edge_to_curr, node_from, old_label, old_node_id, nodes_with_old_label
+
+#
+# def create_new_node_new(total_nodes_count, edge_to_curr, subtree, unique_subtrees_mapped, lemma_nodeid_dict):
+#     new_id = total_nodes_count
+#     subtree_new_label = unique_subtrees_mapped.get(tuple(subtree))
+#     new_label_for_child = str(edge_to_curr.weight) + str(subtree_new_label)
+#     if new_label_for_child not in lemma_nodeid_dict.keys():
+#         lemma_nodeid_dict[new_label_for_child] = [new_id]
+#     else:
+#         lemma_nodeid_dict[new_label_for_child].append(new_id)
+#     return new_id, subtree_new_label
+
 
 
 def create_new_node(total_nodes_count, whole_tree, node_from, edge_to_curr, subtree, curr_node,
@@ -287,6 +309,69 @@ def create_and_remove_edges_to_children(labl, lemma_nodeid_dict, curr_node, whol
                     Tree.remove_edge(whole_tree, old_edge.node_to)
 
 
+def compute_part_new(whole_tree, lemma_count, grouped_heights):
+    classes_subtreeid_nodes = {}
+    k_2 = {}  # identifiers of edges of subtrees
+    lemma_nodeid_dict = {}
+    for nodes in grouped_heights:
+        curr_height = nodes[0]
+        id_lemma_dict = {node.id: node.lemma for node in nodes[1]}
+        grouped_lemmas = defaultdict(list)
+        for key, value in id_lemma_dict.items():
+            grouped_lemmas[value].append(key)
+        add_children_to_parents(k_2, grouped_lemmas, whole_tree, curr_height)
+        filtered_groups = list(filter(lambda x: len(x[1]) > 1, list(grouped_lemmas.items())))
+        for group in filtered_groups:
+            curr_lemma = group[0]
+            combination_ids = {}
+            str_sequence_help = {}
+            for v_id in group[1]:
+                edge_to_curr = Tree.get_edge(whole_tree, v_id)
+                if edge_to_curr is not None:
+                    label_for_child = str(edge_to_curr.weight) + str(curr_lemma)
+                    if label_for_child not in lemma_nodeid_dict.keys():
+                        lemma_nodeid_dict[label_for_child] = [v_id]
+                    else:
+                        lemma_nodeid_dict[label_for_child].append(v_id)
+                if curr_height != 0:  # not applicable to leaves, leaves don't have subtrees
+                    all_combinations_str_joined = produce_combinations(k_2, v_id, str_sequence_help)
+                    for label in all_combinations_str_joined:
+                        if label in combination_ids.keys():
+                            combination_ids[label].append(v_id)
+                        else:
+                            combination_ids[label] = [v_id]
+            if curr_height != 0:  # not applicable to leaves, leaves don't have subtrees
+                filtered_combination_ids = {k: v for k, v in combination_ids.items() if len(v) > 1}
+                dict_nodeid_comb = get_nodeid_repeats(filtered_combination_ids, str_sequence_help)
+                unique_subtrees_mapped, lemma_count = get_unique_subtrees_mapped(dict_nodeid_comb, lemma_count)
+                for node_id, node_subtrees in dict_nodeid_comb.items():
+                    curr_node = Tree.get_node(whole_tree, node_id)
+                    if len(node_subtrees) == 1:  # no need to create new nodes if there is only 1 subtree
+                        classify_existing_node(curr_node, unique_subtrees_mapped, classes_subtreeid_nodes,
+                                               node_subtrees)
+                    else:
+                        edge_to_curr = Tree.get_edge(whole_tree, curr_node.id)
+                        for subtree in node_subtrees:
+                            subtree_new_label = unique_subtrees_mapped.get(tuple(subtree))
+                            new_label_for_child = str(edge_to_curr.weight) + str(subtree_new_label)
+                            if new_label_for_child not in lemma_nodeid_dict.keys():
+                                lemma_nodeid_dict[new_label_for_child] = [node_id]
+                            else:
+                                lemma_nodeid_dict[new_label_for_child].append(node_id)
+
+                            children = Tree.get_children(whole_tree, node_id)
+                            subtree_children = []
+                            for subtree_node in subtree:
+                                target_child = list(lemma_nodeid_dict[subtree_node] & children)[0] # пересечение списков
+                                subtree_children.append(target_child)
+                            new_entry = tuple(node_id, tuple(subtree_children))
+                            if subtree_new_label not in classes_subtreeid_nodes.keys():
+                                classes_subtreeid_nodes[subtree_new_label] = [new_entry]
+                            else:
+                                classes_subtreeid_nodes[subtree_new_label].append(new_entry)
+
+
+
 # TODO: get fid of height grouping
 def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
     # compute subtree repeats
@@ -306,7 +391,7 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
         for key, value in id_lemma_dict.items():
             grouped_lemmas[value].append(key)
         # remember labels of subtrees
-        insert_children_labels_to_parents(k_2, grouped_lemmas, whole_tree)
+        add_children_to_parents(k_2, grouped_lemmas, whole_tree, curr_height)
         # leave for processing only nodes with repeating lemmas on current height
         filtered_groups = list(filter(lambda x: len(x[1]) > 1, list(grouped_lemmas.items())))
 
@@ -315,16 +400,14 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
             curr_lemma = group[0]
             combination_ids = {}
             # same as lemma_nodeid_dict, but for current lemma
-            lemma_nodeid_dict_local = {}
+            str_sequence_help = {}
             # find all possible subtrees combinations and corresponding node ids
             for v_id in group[1]:
-                if v_id == 21:
-                    c = {}
                 # insert node with current lemma in lemma_nodeid_dict
                 insert_nodeid_label_dict(lemma_nodeid_dict, whole_tree, v_id, curr_lemma)
                 if curr_height != 0:  # not applicable to leaves, leaves don't have subtrees
                     # generate possible combinations of child nodes as possible subtree repeats
-                    all_combinations_str_joined = produce_combinations(k_2, v_id, lemma_nodeid_dict_local)
+                    all_combinations_str_joined = produce_combinations(k_2, v_id, str_sequence_help)
                     # mapping nodes ids to combination
                     for label in all_combinations_str_joined:
                         if label in combination_ids.keys():
@@ -340,9 +423,7 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
                 filtered_combination_ids = {k: v for k, v in combination_ids.items() if len(v) > 1}
                 # do a reversed mapping to have a list of repeating subtrees for each node id
                 # concretely, get a dictionary {node id: [[repeating subtree-1 nodes],..., [repeating subtree-N nodes]]}
-                dict_nodeid_comb = get_nodeid_repeats(filtered_combination_ids, lemma_nodeid_dict_local)
-                # for each node leave only non duplicating subtrees
-                remove_duplicate_subtree_repeats(dict_nodeid_comb)
+                dict_nodeid_comb = get_nodeid_repeats(filtered_combination_ids, str_sequence_help)
                 # get unique subtrees for this height and assign them labels
                 unique_subtrees_mapped, lemma_count = get_unique_subtrees_mapped(dict_nodeid_comb, lemma_count)
 
@@ -389,20 +470,21 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
 
 
 def main():
-    trees_df_filtered = read_data()
-    # TEST - тест на первых 3х предложениях
-    trees_df_filtered = trees_df_filtered.head(48)  # 341 - all? 48 - 3 # 3884
-    # trees_df_filtered = trees_df_filtered[trees_df_filtered.sent_name == '48554_5']
-
-    # get all lemmas and create a dictionary to map to numbers
-    dict_lemmas = {lemma: index for index, lemma in enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
-    # get all relations and create a dictionary to map to numbers
-    dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
-    train_word2vec(trees_df_filtered, dict_lemmas)
-
-    start = time.time()
-    whole_tree = construct_tree(trees_df_filtered, dict_lemmas, dict_rel)
-    print('Time on constructing the tree: ' + str(time.time() - start))
+    # trees_df_filtered = read_data()
+    # # TEST - тест на первых 3х предложениях
+    # trees_df_filtered = trees_df_filtered.head(5015)  # 341 - all? 48 - 3 # 3884
+    # # trees_df_filtered = trees_df_filtered[trees_df_filtered.sent_name == '48554_5']
+    #
+    # # get all lemmas and create a dictionary to map to numbers
+    # dict_lemmas = {lemma: index for index, lemma in enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
+    # # get all relations and create a dictionary to map to numbers
+    # dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
+    # train_word2vec(trees_df_filtered, dict_lemmas)
+    #
+    # start = time.time()
+    # whole_tree = construct_tree(trees_df_filtered, dict_lemmas, dict_rel)
+    # print('Time on constructing the tree: ' + str(time.time() - start))
+    whole_tree = new_test()
     Tree.set_help_dict(whole_tree)
     # partition nodes by height
     start = time.time()
@@ -425,7 +507,7 @@ def main():
     # grouped_heights = sorted(grouped_heights.items(), key=lambda x: x[0])
 
     # classes for full repeats
-    start = time.time()
+    # start = time.time()
     # classes_full = compute_full_subtrees(whole_tree, len(dict_lemmas.keys()), grouped_heights)
     # print('Time on calculating full repeats: ' + str(time.time() - start))
     # for index, listt in enumerate(classes_full):

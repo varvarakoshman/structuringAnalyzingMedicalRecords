@@ -1,7 +1,6 @@
 from collections import defaultdict
 import numpy as np
 
-
 # input: map_dict - {v.id: str value of mapped string}
 # returns: sorted_res - {v.id: str value of mapped string} in sorted order
 from Tree import Tree, Node, Edge
@@ -119,4 +118,52 @@ def get_test_tree():
     Tree.add_edge(test_tree, Edge(12, 13, 10))
     Tree.add_edge(test_tree, Edge(2, 5, 20))
     Tree.add_edge(test_tree, Edge(12, 15, 20))
+    return test_tree
+
+
+def new_test():
+    test_tree = Tree()
+    root_node = Node(0, 0)
+    # add root
+    Tree.add_node(test_tree, root_node)
+    # add test nodes
+    Tree.add_node(test_tree, Node(1, 18))
+    Tree.add_node(test_tree, Node(2, 20))
+    Tree.add_node(test_tree, Node(3, 3))
+    Tree.add_node(test_tree, Node(4, 19))
+    Tree.add_node(test_tree, Node(5, 5))
+    Tree.add_node(test_tree, Node(6, 6))
+    Tree.add_node(test_tree, Node(7, 8))
+    Tree.add_node(test_tree, Node(8, 18))
+    Tree.add_node(test_tree, Node(9, 20))
+    Tree.add_node(test_tree, Node(10, 3))
+    Tree.add_node(test_tree, Node(11, 4))
+    Tree.add_node(test_tree, Node(12, 7))
+    Tree.add_node(test_tree, Node(13, 19))
+    Tree.add_node(test_tree, Node(14, 2))
+    Tree.add_node(test_tree, Node(15, 18))
+    Tree.add_node(test_tree, Node(16, 20))
+    Tree.add_node(test_tree, Node(17, 7))
+    Tree.add_node(test_tree, Node(18, 19))
+    Tree.add_node(test_tree, Node(19, 8))
+    # add test edges
+    Tree.add_edge(test_tree, Edge(0, 1, 0))
+    Tree.add_edge(test_tree, Edge(0, 8, 0))
+    Tree.add_edge(test_tree, Edge(0, 15, 0))
+    Tree.add_edge(test_tree, Edge(1, 2, 1))
+    Tree.add_edge(test_tree, Edge(2, 3, 4))
+    Tree.add_edge(test_tree, Edge(2, 4, 9))
+    Tree.add_edge(test_tree, Edge(2, 7, 20))
+    Tree.add_edge(test_tree, Edge(4, 5, 1))
+    Tree.add_edge(test_tree, Edge(5, 6, 1))
+    Tree.add_edge(test_tree, Edge(8, 9, 1))
+    Tree.add_edge(test_tree, Edge(9, 10, 4))
+    Tree.add_edge(test_tree, Edge(9, 12, 10))
+    Tree.add_edge(test_tree, Edge(9, 13, 9))
+    Tree.add_edge(test_tree, Edge(10, 11, 1))
+    Tree.add_edge(test_tree, Edge(15, 16, 1))
+    Tree.add_edge(test_tree, Edge(16, 17, 10))
+    Tree.add_edge(test_tree, Edge(16, 18, 9))
+    Tree.add_edge(test_tree, Edge(16, 19, 20))
+    Tree.add_edge(test_tree, Edge(8, 14, 2))
     return test_tree
