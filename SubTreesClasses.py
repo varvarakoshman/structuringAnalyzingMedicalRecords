@@ -171,7 +171,7 @@ def add_children_to_parents(k_2, grouped_lemmas, whole_tree, curr_height):
                 k_2[parent].add(label_for_child)
                 child_node.is_included = True
                 if parent not in additional_child_nodes.keys():
-                    additional_child_nodes[label_for_child] = parent
+                    additional_child_nodes[label_for_child] = child_id
     return additional_child_nodes
 
 
@@ -330,19 +330,20 @@ def compute_part_new(whole_tree, lemma_count, grouped_heights):
             grouped_lemmas[value].append(key)
         additional_child_nodes = add_children_to_parents(k_2, grouped_lemmas, whole_tree, curr_height)
         filtered_groups = list(filter(lambda x: len(x[1]) > 1, list(grouped_lemmas.items())))
-        for group in filtered_groups:
-            curr_lemma = group[0]
-            combination_ids = {}
-            str_sequence_help = {}
-            str_sequence_help_reversed = {}
-            for v_id in group[1]:
+        for lemma, ids in grouped_lemmas.items():
+            for v_id in ids:
                 edge_to_curr = Tree.get_edge(whole_tree, v_id)
                 if edge_to_curr is not None:
-                    label_for_child = str(edge_to_curr.weight) + str(curr_lemma)
+                    label_for_child = str(edge_to_curr.weight) + str(lemma)
                     if label_for_child not in lemma_nodeid_dict.keys():
                         lemma_nodeid_dict[label_for_child] = {v_id}
                     else:
                         lemma_nodeid_dict[label_for_child].add(v_id)
+        for group in filtered_groups:
+            combination_ids = {}
+            str_sequence_help = {}
+            str_sequence_help_reversed = {}
+            for v_id in group[1]:
                 if curr_height != 0:  # not applicable to leaves, leaves don't have subtrees
                     all_combinations_str_joined = produce_combinations(k_2, v_id, str_sequence_help,
                                                                        str_sequence_help_reversed)
@@ -351,11 +352,11 @@ def compute_part_new(whole_tree, lemma_count, grouped_heights):
                             combination_ids[label].append(v_id)
                         else:
                             combination_ids[label] = [v_id]
-            for additional_child, parent in additional_child_nodes.items():
+            for additional_child, child_id in additional_child_nodes.items():
                 if additional_child not in lemma_nodeid_dict.keys():
-                    lemma_nodeid_dict[additional_child] = {parent}
+                    lemma_nodeid_dict[additional_child] = {child_id}
                 else:
-                    lemma_nodeid_dict[additional_child].add(parent)
+                    lemma_nodeid_dict[additional_child].add(child_id)
             if curr_height != 0:  # not applicable to leaves, leaves don't have subtrees
                 filtered_combination_ids = {k: v for k, v in combination_ids.items() if len(v) > 1}
                 for tree_label, node_list in filtered_combination_ids.items():
@@ -370,15 +371,15 @@ def compute_part_new(whole_tree, lemma_count, grouped_heights):
                 # unique_subtrees_mapped, lemma_count = get_unique_subtrees_mapped(dict_nodeid_comb, lemma_count, unique_subtrees_mapped_global_node_ids)
                 for node_id, node_subtrees in dict_nodeid_comb.items():
                     curr_node = Tree.get_node(whole_tree, node_id)
-                    edge_to_curr = Tree.get_edge(whole_tree, curr_node.id)
+                    # edge_to_curr = Tree.get_edge(whole_tree, curr_node.id)
                     for subtree in node_subtrees:
                         subtree_text = str_sequence_help_reversed.get(tuple(subtree))
                         subtree_new_label = unique_subtrees_mapped_global_subtree_lemma.get(subtree_text)
-                        new_label_for_child = str(edge_to_curr.weight) + str(subtree_new_label)
-                        if new_label_for_child not in lemma_nodeid_dict.keys():
-                            lemma_nodeid_dict[new_label_for_child] = {node_id}
+                        # new_label_for_child = str(edge_to_curr.weight) + str(subtree_new_label)
+                        if subtree_text not in lemma_nodeid_dict.keys():
+                            lemma_nodeid_dict[subtree_text] = {node_id}
                         else:
-                            lemma_nodeid_dict[new_label_for_child].add(node_id)
+                            lemma_nodeid_dict[subtree_text].add(node_id)
 
                         children = Tree.get_children(whole_tree, node_id)
                         subtree_children = []
@@ -390,6 +391,7 @@ def compute_part_new(whole_tree, lemma_count, grouped_heights):
                             classes_subtreeid_nodes[subtree_new_label] = [new_entry]
                         else:
                             classes_subtreeid_nodes[subtree_new_label].append(new_entry)
+    return classes_subtreeid_nodes
 
 
 # TODO: get fid of height grouping
@@ -490,21 +492,21 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
 
 
 def main():
-    # trees_df_filtered = read_data()
+    trees_df_filtered = read_data()
     # # TEST - тест на первых 3х предложениях
-    # trees_df_filtered = trees_df_filtered.head(5015)  # 341 - all? 48 - 3 # 3884
+    trees_df_filtered = trees_df_filtered.head(48)  # 341 - all? 48 - 3 # 3884 # 5015
     # # trees_df_filtered = trees_df_filtered[trees_df_filtered.sent_name == '48554_5']
     #
     # # get all lemmas and create a dictionary to map to numbers
-    # dict_lemmas = {lemma: index for index, lemma in enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
+    dict_lemmas = {lemma: index for index, lemma in enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
     # # get all relations and create a dictionary to map to numbers
-    # dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
-    # train_word2vec(trees_df_filtered, dict_lemmas)
+    dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
+    train_word2vec(trees_df_filtered, dict_lemmas)
     #
     # start = time.time()
-    # whole_tree = construct_tree(trees_df_filtered, dict_lemmas, dict_rel)
+    whole_tree = construct_tree(trees_df_filtered, dict_lemmas, dict_rel)
     # print('Time on constructing the tree: ' + str(time.time() - start))
-    whole_tree = new_test()
+    # whole_tree = new_test()
     Tree.set_help_dict(whole_tree)
     # partition nodes by height
     start = time.time()
