@@ -324,6 +324,8 @@ def compute_part_new(whole_tree, lemma_count, grouped_heights):
     lemma_nodeid_dict = {}
     for nodes in grouped_heights:
         curr_height = nodes[0]
+        if curr_height == 2:
+            djksf = {}
         id_lemma_dict = {node.id: node.lemma for node in nodes[1]}
         grouped_lemmas = defaultdict(list)
         for key, value in id_lemma_dict.items():
@@ -492,21 +494,21 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
 
 
 def main():
-    trees_df_filtered = read_data()
+    # trees_df_filtered = read_data()
     # # TEST - тест на первых 3х предложениях
-    trees_df_filtered = trees_df_filtered.head(48)  # 341 - all? 48 - 3 # 3884 # 5015
+    # trees_df_filtered = trees_df_filtered.head(48)  # 341 - all? 48 - 3 # 3884 # 5015
     # # trees_df_filtered = trees_df_filtered[trees_df_filtered.sent_name == '48554_5']
     #
     # # get all lemmas and create a dictionary to map to numbers
-    dict_lemmas = {lemma: index for index, lemma in enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
+    # dict_lemmas = {lemma: index for index, lemma in enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
     # # get all relations and create a dictionary to map to numbers
-    dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
-    train_word2vec(trees_df_filtered, dict_lemmas)
+    # dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
+    # train_word2vec(trees_df_filtered, dict_lemmas)
     #
-    # start = time.time()
-    whole_tree = construct_tree(trees_df_filtered, dict_lemmas, dict_rel)
+    start = time.time()
+    # whole_tree = construct_tree(trees_df_filtered, dict_lemmas, dict_rel)
     # print('Time on constructing the tree: ' + str(time.time() - start))
-    # whole_tree = new_test()
+    whole_tree = new_test()
     Tree.set_help_dict(whole_tree)
     # partition nodes by height
     start = time.time()

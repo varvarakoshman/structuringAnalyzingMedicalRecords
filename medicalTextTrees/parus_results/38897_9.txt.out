@@ -1,0 +1,12 @@
+1	03.10.10	#пдата	M	M	Mc---d	2	обст
+2	вызывал	вызывать	V	V	Vmis-sma-p	0	ROOT
+3	СМП	смп	N	N	Npmsnn	2	1-компл
+4	,	,	,	,	,	3	PUNC
+5	однако	однако	C	C	C	0	ROOT
+6	в	в	S	S	Sp-l	0	ROOT
+7	транспортировке	транспортировка	N	N	Ncfsln	6	предл
+8	в	в	S	S	Sp-a	7	2-компл
+9	стационар	стационар	N	N	Ncmsan	8	предл
+10	больному	больной	N	N	Ncmsdy	0	ROOT
+11	было	быть	V	V	Vmis-sna-p	0	ROOT
+12	отказано	отказать	V	V	Vmps-snpse	11	пасс-анал

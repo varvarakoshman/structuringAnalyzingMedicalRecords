@@ -1,0 +1,7 @@
+1	С	с	S	S	Sp-g	0	ROOT
+2	января	#месяц	N	N	Ncmsgn	1	предл
+3	2009	#год	M	M	Mc---d	4	опред
+4	года	год	N	N	Ncmsgn	2	атриб
+5	постоянная	постоянный	A	A	Afpfsnf	6	опред
+6	форма	форма	N	N	Ncfsnn	0	ROOT
+7	ФП	фп	N	N	Npmsnn	6	квазиагент

@@ -1,0 +1,9 @@
+1	Мать	мать	N	N	Ncfsny	6	предик
+2	(	(	-	-	-	1	PUNC
+3	75	#число	M	M	Mc---d	4	количест
+4	лет	год	N	N	Ncmpgn	1	примыкат
+5	)	)	-	-	-	4	PUNC
+6	страдает	страдать	V	V	Vmip3s-a-p	0	ROOT
+7	ГБ	гб	N	N	Npmsln	6	1-компл
+8	,	,	,	,	,	7	PUNC
+9	ИБС	ибс	N	N	Npmsnn	7	сочин
