@@ -4,7 +4,7 @@ import itertools
 
 
 class Node:
-    def __init__(self, id, lemma, form=None, sent_name=None, is_included=False):
+    def __init__(self, id, lemma=None, form=None, sent_name=None, is_included=False):
         self.id = id
         self.lemma = lemma
         self.form = form
@@ -20,10 +20,12 @@ class Edge:
 
 
 class Tree:
+
     def __init__(self):
         self.edges = []
         self.nodes = []
         # self.heights = []
+        self.inactive = []
         self.heights = {}
         self.edges_dict_from = {}
         self.edges_dict_to = {}
@@ -33,7 +35,7 @@ class Tree:
         self.edges_dict_from = {k: list(v) for k, v in itertools.groupby(sorted(self.edges, key=lambda x: x.node_from),
                                                                          key=lambda x: x.node_from)}
         self.nodes_dict_id = {node.id: node for node in self.nodes}
-        self.edges_dict_to = {k: list(v)[0] for k, v in itertools.groupby(self.edges, key=lambda x: x.node_to)}
+        self.edges_dict_to = {k: list(v) for k, v in itertools.groupby(self.edges, key=lambda x: x.node_to)}
 
     def add_node(self, node):
         self.nodes.append(node)
@@ -46,13 +48,59 @@ class Tree:
 
     def get_children(self, node_id):
         edges = self.edges_dict_from.get(node_id)
-        return list(map(lambda x: x.node_to, edges if edges is not None else []))
+        only_active = list(filter(lambda edge: edge.node_to not in self.inactive and edge.node_from not in self.inactive, edges if edges is not None else []))
+        return list(map(lambda x: x.node_to, only_active if only_active is not None else []))
 
     def get_edge(self, to_id):
         return self.edges_dict_to.get(to_id)
 
     def remove_edge(self, to_id):
         self.edges = list(filter(lambda x: x.node_to != to_id, self.edges))
+
+    def copy_node_details(self, existing_node):
+        new_node = Node(id=len(self.nodes),
+                    form=existing_node.form,
+                    sent_name=existing_node.sent_name,
+                    is_included=existing_node.is_included)
+        self.nodes_dict_id[new_node.id] = new_node
+        return new_node
+
+    def add_new_edges(self, new_node_id, children):
+        for child_id in children:
+            new_edge = Edge(new_node_id, child_id, self.get_edge(child_id)[0].weight)
+            if child_id in self.edges_dict_to.keys():
+                self.edges_dict_to[child_id].append(new_edge)
+            else:
+                self.edges_dict_to[child_id] = [new_edge]
+            self.edges.append(new_edge)
+            if new_node_id in self.edges_dict_from.keys():
+                self.edges_dict_from[new_node_id].append(new_edge)
+            else:
+                self.edges_dict_from[new_node_id] = [new_edge]
+
+    def add_edge_to_dict(self, edge):
+        self.edges_dict_to[edge.node_to] = [edge]
+        if edge.node_from in self.edges_dict_from.keys():
+            self.edges_dict_from[edge.node_from].append(edge)
+        else:
+            self.edges_dict_from[edge.node_from] = edge
+        self.edges.append(edge)
+
+    def add_node_to_dict(self, node):
+        self.nodes_dict_id[node.id] = node
+        self.nodes.append(node)
+
+    def add_inactive(self, node_id):
+        self.inactive.append(node_id)
+    #
+    # def remove_node(self, existing_node, existing_edge):
+    #     self.nodes.remove(existing_node)
+    #     self.nodes_dict_id.pop(existing_node.id)
+    #     self.edges_dict_from.pop(existing_node.id)
+    #     self.edges_dict_to.pop(existing_node.id)
+    #     old_edge = list(filter(lambda x: x.node_to == existing_node.id, self.edges_dict_from[existing_edge.node_from]))
+    #     if len(old_edge) > 0:
+    #         self.edges_dict_from[existing_edge.node_from].remove(old_edge)
 
     # def calculate_heights(self):
     #     visited = np.full(len(self.nodes), False, dtype=bool)
