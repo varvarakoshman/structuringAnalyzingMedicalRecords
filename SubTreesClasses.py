@@ -366,7 +366,7 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
     lemma_nodeid_dict = {}
     for nodes in grouped_heights:
         curr_height = nodes[0]
-        if curr_height == 1:
+        if curr_height == 2:
             djksf = {}
         id_lemma_dict = {node.id: node.lemma for node in nodes[1]}
         grouped_lemmas = defaultdict(list)
@@ -485,19 +485,18 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
                         else:
                             classes_subtreeid_nodes[subtree_new_label].append(new_node.id)
 
-                        if subtree_new_label not in classes_subtreeid_nodes_list.keys():
-                            classes_subtreeid_nodes_list[subtree_new_label] = subtree_children
-                        else:
-                            classes_subtreeid_nodes_list[subtree_new_label].extend(subtree_children)
                         subtree_deep_children = []
                         for subtree_lemma in list(map(lambda x: Tree.get_node(whole_tree, x).lemma, subtree_children)):
                             if subtree_lemma in classes_subtreeid_nodes_list.keys():
-                                try:
-                                    subtree_deep_children.extend(classes_subtreeid_nodes_list[subtree_lemma])
-                                except TypeError as e:
-                                    hjvhjgh =[]
-                        classes_subtreeid_nodes_list[subtree_new_label].extend(subtree_deep_children)
-                        classes_subtreeid_nodes_list[subtree_new_label].append(new_node.id)
+                                subtree_deep_children.extend(classes_subtreeid_nodes_list[subtree_lemma])
+                        subtree_deep_children.extend(subtree_children)
+                        only_active = list(filter(lambda x: x not in whole_tree.inactive, subtree_deep_children))
+
+                        if subtree_new_label not in classes_subtreeid_nodes_list.keys():
+                            classes_subtreeid_nodes_list[subtree_new_label] = set(only_active)
+                        else:
+                            classes_subtreeid_nodes_list[subtree_new_label].update(only_active)
+                        classes_subtreeid_nodes_list[subtree_new_label].add(new_node.id)
 
                     # remove old node and edges to/from it
                     Tree.add_inactive(whole_tree, node_id)
@@ -710,21 +709,21 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
 
 
 def main():
-    # trees_df_filtered = read_data()
+    trees_df_filtered = read_data()
     # # TEST - тест на первых 3х предложениях
-    # trees_df_filtered = trees_df_filtered.head(48)  # 341 - all? 48 - 3 # 3884 # 5015
+    trees_df_filtered = trees_df_filtered.head(48)  # 341 - all? 48 - 3 # 3884 # 5015
     # # trees_df_filtered = trees_df_filtered[trees_df_filtered.sent_name == '48554_5']
     #
-    # # get all lemmas and create a dictionary to map to numbers
-    # dict_lemmas = {lemma: index for index, lemma in enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
-    # # get all relations and create a dictionary to map to numbers
-    # dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
-    # train_word2vec(trees_df_filtered, dict_lemmas)
+    # get all lemmas and create a dictionary to map to numbers
+    dict_lemmas = {lemma: index for index, lemma in enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
+    # get all relations and create a dictionary to map to numbers
+    dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
+    train_word2vec(trees_df_filtered, dict_lemmas)
     #
     start = time.time()
-    # whole_tree = construct_tree(trees_df_filtered, dict_lemmas, dict_rel)
-    # print('Time on constructing the tree: ' + str(time.time() - start))
-    whole_tree = new_test()
+    whole_tree = construct_tree(trees_df_filtered, dict_lemmas, dict_rel)
+    print('Time on constructing the tree: ' + str(time.time() - start))
+    # whole_tree = new_test()
     Tree.set_help_dict(whole_tree)
     # partition nodes by height
     start = time.time()
