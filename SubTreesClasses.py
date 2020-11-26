@@ -473,10 +473,7 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
                             if len(intersection) != 0:
                                 target_child = list(intersection)[0]
                             else:
-                                try:
-                                    target_child = list(set(lemma_nodeid_dict[equal_nodes_mapping[subtree_node]]) & set(children))[0]
-                                except KeyError as e:
-                                    sdfgs = []
+                                target_child = list(set(lemma_nodeid_dict[equal_nodes_mapping[subtree_node]]) & set(children))[0]
                             subtree_children.append(target_child)
 
                         # add edges to subtree's children from new node
@@ -487,6 +484,20 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
                             classes_subtreeid_nodes[subtree_new_label] = [new_node.id]
                         else:
                             classes_subtreeid_nodes[subtree_new_label].append(new_node.id)
+
+                        if subtree_new_label not in classes_subtreeid_nodes_list.keys():
+                            classes_subtreeid_nodes_list[subtree_new_label] = subtree_children
+                        else:
+                            classes_subtreeid_nodes_list[subtree_new_label].extend(subtree_children)
+                        subtree_deep_children = []
+                        for subtree_lemma in list(map(lambda x: Tree.get_node(whole_tree, x).lemma, subtree_children)):
+                            if subtree_lemma in classes_subtreeid_nodes_list.keys():
+                                try:
+                                    subtree_deep_children.extend(classes_subtreeid_nodes_list[subtree_lemma])
+                                except TypeError as e:
+                                    hjvhjgh =[]
+                        classes_subtreeid_nodes_list[subtree_new_label].extend(subtree_deep_children)
+                        classes_subtreeid_nodes_list[subtree_new_label].append(new_node.id)
 
                     # remove old node and edges to/from it
                     Tree.add_inactive(whole_tree, node_id)
