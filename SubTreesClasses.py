@@ -357,7 +357,8 @@ def create_and_remove_edges_to_children(labl, lemma_nodeid_dict, curr_node, whol
 
 def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
     classes_subtreeid_nodes = {}
-    unique_subtrees_mapped_global_node_ids = {}
+    classes_subtreeid_nodes_list = {}
+    # unique_subtrees_mapped_global_node_ids = {}
     unique_subtrees_mapped_global_subtree_lemma = {}
     old_node_new_nodes = {}
     equal_nodes_mapping = {}
@@ -365,7 +366,7 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
     lemma_nodeid_dict = {}
     for nodes in grouped_heights:
         curr_height = nodes[0]
-        if curr_height == 0:
+        if curr_height == 1:
             djksf = {}
         id_lemma_dict = {node.id: node.lemma for node in nodes[1]}
         grouped_lemmas = defaultdict(list)
@@ -388,14 +389,19 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
                     else:
                         lemma_nodeid_dict[label_for_child].add(v_id)
         filtered_groups = {k: v for k, v in grouped_lemmas.items() if len(v) > 1}
-        for lemma, ids in filtered_groups.items():
-            combination_ids = {}
-            str_sequence_help = {}
-            str_sequence_help_reversed = {}
-            if curr_height != 0:  # not applicable to leaves, leaves don't have subtrees
+
+        if curr_height != 0:  # not applicable to leaves, leaves don't have subtrees
+            for lemma, ids in filtered_groups.items():
+                combination_ids = {}
+                str_sequence_help = {}
+                str_sequence_help_reversed = {}
+
+                # generate combinations
                 for v_id in ids:
                     equal_nodes = {}
-                    for child in Tree.get_children(whole_tree, v_id):
+                    # only for duplicating nodes
+                    children = list(filter(lambda child: child not in whole_tree.created, Tree.get_children(whole_tree, v_id)))
+                    for child in children:
                         if child in old_node_new_nodes.keys():
                             edge_to_child = Tree.get_edge(whole_tree, child)[0]
                             child_node = Tree.get_node(whole_tree, child)
@@ -424,60 +430,66 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
                         else:
                             combination_ids[label] = [v_id]
 
-                    filtered_combination_ids = {k: v for k, v in combination_ids.items() if len(v) > 1}
-                    for tree_label, node_list in filtered_combination_ids.items():
-                        if tree_label not in unique_subtrees_mapped_global_node_ids:
-                            unique_subtrees_mapped_global_node_ids[tree_label] = node_list
-                            unique_subtrees_mapped_global_subtree_lemma[tree_label] = lemma_count
-                            lemma_count += 1
+                filtered_combination_ids = {k: v for k, v in combination_ids.items() if len(v) > 1}
+                for tree_label, node_list in filtered_combination_ids.items():
+                    if tree_label not in unique_subtrees_mapped_global_subtree_lemma.keys():
+                        unique_subtrees_mapped_global_subtree_lemma[tree_label] = lemma_count
+                        lemma_count += 1
+                # 16: [['107', '919'], ['208', '919'], ['919'], ['107'], ['208']]
+                dict_nodeid_comb = get_nodeid_repeats(filtered_combination_ids, str_sequence_help)
+                for node_id, node_subtrees in dict_nodeid_comb.items():
+                    existing_node = Tree.get_node(whole_tree, node_id)
+                    edge_to_curr = Tree.get_edge(whole_tree, node_id)[0]
+                    children = Tree.get_children(whole_tree, node_id)
+                    for subtree in node_subtrees:
+                        subtree_text = str_sequence_help_reversed.get(tuple(subtree))
+                        subtree_new_label = unique_subtrees_mapped_global_subtree_lemma.get(subtree_text)
+
+                        # add new node with a new lemma
+                        new_node = Tree.copy_node_details(whole_tree, existing_node)
+                        new_node.lemma = subtree_new_label
+                        Tree.add_node_to_dict(whole_tree, new_node)
+
+                        # add new node to node aliases
+                        if node_id not in old_node_new_nodes.keys():
+                            old_node_new_nodes[node_id] = [new_node.lemma]
                         else:
-                            for node in node_list:
-                                unique_subtrees_mapped_global_node_ids[tree_label].append(node)
-                    dict_nodeid_comb = get_nodeid_repeats(filtered_combination_ids, str_sequence_help)
-                    for node_id, node_subtrees in dict_nodeid_comb.items():
-                        existing_node = Tree.get_node(whole_tree, node_id)
-                        edge_to_curr = Tree.get_edge(whole_tree, node_id)[0]
-                        children = Tree.get_children(whole_tree, node_id)
-                        for subtree in node_subtrees:
-                            subtree_text = str_sequence_help_reversed.get(tuple(subtree))
-                            subtree_new_label = unique_subtrees_mapped_global_subtree_lemma.get(subtree_text)
+                            old_node_new_nodes[node_id].append(new_node.lemma)
 
-                            # add new node with a new lemma
-                            new_node = Tree.copy_node_details(whole_tree, existing_node)
-                            new_node.lemma = subtree_new_label
-                            Tree.add_node_to_dict(whole_tree, new_node)
-                            # add an edge to it
-                            edge = Edge(edge_to_curr.node_from, new_node.id, edge_to_curr.weight)
-                            Tree.add_edge_to_dict(whole_tree, edge)
+                        # add an edge to it
+                        edge = Edge(edge_to_curr.node_from, new_node.id, edge_to_curr.weight)
+                        Tree.add_edge_to_dict(whole_tree, edge)
 
-                            if subtree_text not in lemma_nodeid_dict.keys():
-                                lemma_nodeid_dict[subtree_text] = {new_node.id}
+                        # add new node to parent
+                        parent_subtree_text = str(edge_to_curr.weight) + str(subtree_new_label)
+                        if parent_subtree_text not in lemma_nodeid_dict.keys():
+                            lemma_nodeid_dict[parent_subtree_text] = {new_node.id}
+                        else:
+                            lemma_nodeid_dict[parent_subtree_text].add(new_node.id)
+
+                        subtree_children = []
+                        for subtree_node in subtree:
+                            intersection = set(lemma_nodeid_dict[subtree_node]) & set(children)
+                            if len(intersection) != 0:
+                                target_child = list(intersection)[0]
                             else:
-                                lemma_nodeid_dict[subtree_text].add(new_node.id)
-                            subtree_children = []
-                            for subtree_node in subtree:
-                                intersection = set(lemma_nodeid_dict[subtree_node]) & set(children)
-                                if len(intersection) != 0:
-                                    target_child = list(intersection)[0]
-                                else:
-                                    try:
-                                        target_child = \
-                                        list(set(lemma_nodeid_dict[equal_nodes_mapping[subtree_node]]) & set(children))[
-                                            0]
-                                    except KeyError as e:
-                                        sdfgs = []
-                                subtree_children.append(target_child)
+                                try:
+                                    target_child = list(set(lemma_nodeid_dict[equal_nodes_mapping[subtree_node]]) & set(children))[0]
+                                except KeyError as e:
+                                    sdfgs = []
+                            subtree_children.append(target_child)
 
-                            # add edges to subtree's children from new node
-                            Tree.add_new_edges(whole_tree, new_node.id, subtree_children)
+                        # add edges to subtree's children from new node
+                        Tree.add_new_edges(whole_tree, new_node.id, subtree_children)
 
-                            if subtree_new_label not in classes_subtreeid_nodes.keys():
-                                classes_subtreeid_nodes[subtree_new_label] = [new_node.id]
-                            else:
-                                classes_subtreeid_nodes[subtree_new_label].append(new_node.id)
+                        # assign class
+                        if subtree_new_label not in classes_subtreeid_nodes.keys():
+                            classes_subtreeid_nodes[subtree_new_label] = [new_node.id]
+                        else:
+                            classes_subtreeid_nodes[subtree_new_label].append(new_node.id)
 
-                        # remove old node and edges to/from it
-                        Tree.add_inactive(whole_tree, node_id)
+                    # remove old node and edges to/from it
+                    Tree.add_inactive(whole_tree, node_id)
     return classes_subtreeid_nodes
 
 
