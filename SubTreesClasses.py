@@ -358,7 +358,6 @@ def create_and_remove_edges_to_children(labl, lemma_nodeid_dict, curr_node, whol
 def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
     classes_subtreeid_nodes = {}
     classes_subtreeid_nodes_list = {}
-    # unique_subtrees_mapped_global_node_ids = {}
     unique_subtrees_mapped_global_subtree_lemma = {}
     old_node_new_nodes = {}
     equal_nodes_mapping = {}
@@ -366,8 +365,8 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
     lemma_nodeid_dict = {}
     for nodes in grouped_heights:
         curr_height = nodes[0]
-        if curr_height == 2:
-            djksf = {}
+        print(curr_height)
+        start = time.time()
         id_lemma_dict = {node.id: node.lemma for node in nodes[1]}
         grouped_lemmas = defaultdict(list)
         for key, value in id_lemma_dict.items():
@@ -468,38 +467,52 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
                             lemma_nodeid_dict[parent_subtree_text].add(new_node.id)
 
                         subtree_children = []
+                        children_nodes = {}
+                        for child in children:
+                            child_node = Tree.get_node(whole_tree, child)
+                            child_node_lemma = str(Tree.get_edge(whole_tree, child)[0].weight) + str(child_node.lemma)
+                            children_nodes[child_node_lemma] = child_node.id
+                            children_nodes[str(child_node.lemma)] = child_node.id
                         for subtree_node in subtree:
-                            intersection = set(lemma_nodeid_dict[subtree_node]) & set(children)
-                            if len(intersection) != 0:
-                                target_child = list(intersection)[0]
+                            if subtree_node not in lemma_nodeid_dict.keys():
+                                if subtree_node in equal_nodes_mapping.keys():
+                                    target_child = list(set(lemma_nodeid_dict[equal_nodes_mapping[subtree_node]]) & set(children))[0]
+                                else:
+                                    target_child = children_nodes[subtree_node]
                             else:
-                                target_child = list(set(lemma_nodeid_dict[equal_nodes_mapping[subtree_node]]) & set(children))[0]
+                                intersection = set(lemma_nodeid_dict[subtree_node]) & set(children)
+                                if len(intersection) == 0:
+                                    target_child = children_nodes[subtree_node]
+                                else:
+                                    target_child = list(intersection)[0]
                             subtree_children.append(target_child)
 
-                        # add edges to subtree's children from new node
-                        Tree.add_new_edges(whole_tree, new_node.id, subtree_children)
+                        if len(subtree_children) > 0:
+                            # add edges to subtree's children from new node
+                            Tree.add_new_edges(whole_tree, new_node.id, subtree_children)
 
-                        # assign class
-                        if subtree_new_label not in classes_subtreeid_nodes.keys():
-                            classes_subtreeid_nodes[subtree_new_label] = [new_node.id]
-                        else:
-                            classes_subtreeid_nodes[subtree_new_label].append(new_node.id)
+                            # assign class
+                            if subtree_new_label not in classes_subtreeid_nodes.keys():
+                                classes_subtreeid_nodes[subtree_new_label] = [new_node.id]
+                            else:
+                                classes_subtreeid_nodes[subtree_new_label].append(new_node.id)
 
-                        subtree_deep_children = []
-                        for subtree_lemma in list(map(lambda x: Tree.get_node(whole_tree, x).lemma, subtree_children)):
-                            if subtree_lemma in classes_subtreeid_nodes_list.keys():
-                                subtree_deep_children.extend(classes_subtreeid_nodes_list[subtree_lemma])
-                        subtree_deep_children.extend(subtree_children)
-                        only_active = list(filter(lambda x: x not in whole_tree.inactive, subtree_deep_children))
+                            subtree_deep_children = []
+                            for subtree_lemma in list(map(lambda x: Tree.get_node(whole_tree, x).lemma, subtree_children)):
+                                if subtree_lemma in classes_subtreeid_nodes_list.keys():
+                                    subtree_deep_children.extend(classes_subtreeid_nodes_list[subtree_lemma])
+                            subtree_deep_children.extend(subtree_children)
+                            only_active = list(filter(lambda x: x not in whole_tree.inactive, subtree_deep_children))
 
-                        if subtree_new_label not in classes_subtreeid_nodes_list.keys():
-                            classes_subtreeid_nodes_list[subtree_new_label] = set(only_active)
-                        else:
-                            classes_subtreeid_nodes_list[subtree_new_label].update(only_active)
-                        classes_subtreeid_nodes_list[subtree_new_label].add(new_node.id)
+                            if subtree_new_label not in classes_subtreeid_nodes_list.keys():
+                                classes_subtreeid_nodes_list[subtree_new_label] = set(only_active)
+                            else:
+                                classes_subtreeid_nodes_list[subtree_new_label].update(only_active)
+                            classes_subtreeid_nodes_list[subtree_new_label].add(new_node.id)
 
                     # remove old node and edges to/from it
                     Tree.add_inactive(whole_tree, node_id)
+        print(time.time() - start)
     return classes_subtreeid_nodes
 
 
@@ -513,8 +526,8 @@ def compute_part_new(whole_tree, lemma_count, grouped_heights):
     equal_nodes_mapping = {}
     for nodes in grouped_heights:
         curr_height = nodes[0]
-        if curr_height == 2:
-            djksf = {}
+        print(curr_height)
+        start = time.time()
         id_lemma_dict = {node.id: node.lemma for node in nodes[1]}
         grouped_lemmas = defaultdict(list)
         for key, value in id_lemma_dict.items():
@@ -608,6 +621,7 @@ def compute_part_new(whole_tree, lemma_count, grouped_heights):
                             classes_subtreeid_nodes[subtree_new_label] = [new_entry]
                         else:
                             classes_subtreeid_nodes[subtree_new_label].append(new_entry)
+        print(time.time() - start)
     return classes_subtreeid_nodes
 
 
@@ -711,7 +725,7 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
 def main():
     trees_df_filtered = read_data()
     # # TEST - тест на первых 3х предложениях
-    trees_df_filtered = trees_df_filtered.head(48)  # 341 - all? 48 - 3 # 3884 # 5015
+    trees_df_filtered = trees_df_filtered.head(5015)  # 341 - all? 48 - 3 # 3884 # 5015
     # # trees_df_filtered = trees_df_filtered[trees_df_filtered.sent_name == '48554_5']
     #
     # get all lemmas and create a dictionary to map to numbers
@@ -765,7 +779,7 @@ def main():
     start = time.time()
     classes_part = compute_part_new_new(whole_tree, dict_lemmas_size, grouped_heights)
     # classes_part = compute_part_subtrees(whole_tree, dict_lemmas_size, grouped_heights)
-    print('Time on calculating partial repeats: ' + str(time.time() - start))
+    print('Time on calculating partial repeats: ' + str((time.time() - start) % 60))
     for k, v in classes_part.items():
         vertex_seq = {}
         for vertex in v:
