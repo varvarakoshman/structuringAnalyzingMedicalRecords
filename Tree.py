@@ -24,9 +24,8 @@ class Tree:
     def __init__(self):
         self.edges = []
         self.nodes = []
-        # self.heights = []
-        self.inactive = []
-        self.created = []
+        self.inactive = set()
+        self.created = set()
         self.heights = {}
         self.edges_dict_from = {}
         self.edges_dict_to = {}
@@ -51,7 +50,7 @@ class Tree:
         edges = self.edges_dict_from.get(node_id)
         # only_active = list(filter(lambda edge: edge.node_to not in self.inactive and edge.node_from not in self.inactive, edges if edges is not None else []))
         # return list(map(lambda x: x.node_to, only_active if only_active is not None else []))
-        return list(map(lambda x: x.node_to, edges if edges is not None else []))
+        return set(map(lambda x: x.node_to, edges if edges is not None else []))
 
     def get_edge(self, to_id):
         return self.edges_dict_to.get(to_id)
@@ -65,7 +64,7 @@ class Tree:
                     sent_name=existing_node.sent_name,
                     is_included=existing_node.is_included)
         self.nodes_dict_id[new_node.id] = new_node
-        self.created.append(new_node.id)
+        self.created.add(new_node.id)
         return new_node
 
     def add_new_edges(self, new_node_id, children):
@@ -94,7 +93,13 @@ class Tree:
         self.nodes.append(node)
 
     def add_inactive(self, node_id):
-        self.inactive.append(node_id)
+        self.inactive.add(node_id)
+
+    def get_children_nodes(self, children):
+        children_nodes = {
+            str(Tree.get_edge(self, child)[0].weight) + str(Tree.get_node(self, child).lemma): child for
+            child in children}
+        return children_nodes
     #
     # def remove_node(self, existing_node, existing_edge):
     #     self.nodes.remove(existing_node)

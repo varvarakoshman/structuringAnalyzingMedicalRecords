@@ -9,6 +9,7 @@ from gensim.models import Word2Vec
 from Tree import Tree, Node, Edge
 from Util import radix_sort, sort_strings_inside, remap_s, new_test
 
+EMPTY_STR = ''
 
 def read_data():
     DATA_PATH = r'medicalTextTrees/parus_results'
@@ -226,9 +227,6 @@ def produce_combinations(k_2, v_id, str_sequence_help, str_sequence_help_reverse
             else:
                 prepared_k_2.add(child_tree)
         combinations_repeated = list(product(*(list_for_combinations)))
-        # test1 = ['10', '11', '12', '13']
-        # test2 = ['14', '15']
-        # combinations_repeated = list(product(*([list_for_combinations[0], test1, test2])))
         all_combinations = []
         if len(prepared_k_2) > 0:
             for l in combinations_repeated:
@@ -243,8 +241,8 @@ def produce_combinations(k_2, v_id, str_sequence_help, str_sequence_help_reverse
     all_combinations_str_joined = set()
     for comb in all_combinations:
         for tup in comb:
-            combs = [str(item) for item in sorted(list(map(int, list(tup))))]
-            joined_label = ''.join(sorted(combs))
+            combs = [str(item) for item in sorted(list(tup))]
+            joined_label = EMPTY_STR.join(combs)
             if joined_label not in str_sequence_help.keys():
                 str_sequence_help[joined_label] = combs
                 str_sequence_help_reversed[tuple(combs)] = joined_label
@@ -399,26 +397,21 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
                 for v_id in ids:
                     equal_nodes = {}
                     # only for duplicating nodes
-                    children = list(filter(lambda child: child not in whole_tree.created, Tree.get_children(whole_tree, v_id)))
+                    children = Tree.get_children(whole_tree, v_id) - whole_tree.created
                     for child in children:
                         if child in old_node_new_nodes.keys():
                             edge_to_child = Tree.get_edge(whole_tree, child)[0]
                             child_node = Tree.get_node(whole_tree, child)
                             w = str(edge_to_child.weight)
                             actual_label = w + str(child_node.lemma)
+                            merge = []
+                            for l in old_node_new_nodes[child]:
+                                new_label = w + str(l)
+                                merge.append(new_label)
+                                equal_nodes_mapping[new_label] = actual_label
                             if actual_label not in equal_nodes.keys():
-                                merge = []
-                                for l in old_node_new_nodes[child]:
-                                    new_label = w + str(l)
-                                    merge.append(new_label)
-                                    equal_nodes_mapping[new_label] = actual_label
                                 equal_nodes[actual_label] = merge
                             else:
-                                merge = []
-                                for l in old_node_new_nodes[child]:
-                                    new_label = w + str(l)
-                                    merge.append(new_label)
-                                    equal_nodes_mapping[new_label] = actual_label
                                 equal_nodes[actual_label].extend(merge)
                     all_combinations_str_joined = produce_combinations(k_2, v_id, str_sequence_help,
                                                                        str_sequence_help_reversed, equal_nodes,
@@ -468,20 +461,19 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
 
                         subtree_children = []
                         children_nodes = {}
-                        for child in children:
-                            child_node = Tree.get_node(whole_tree, child)
-                            child_node_lemma = str(Tree.get_edge(whole_tree, child)[0].weight) + str(child_node.lemma)
-                            children_nodes[child_node_lemma] = child_node.id
-                            children_nodes[str(child_node.lemma)] = child_node.id
                         for subtree_node in subtree:
                             if subtree_node not in lemma_nodeid_dict.keys():
                                 if subtree_node in equal_nodes_mapping.keys():
-                                    target_child = list(set(lemma_nodeid_dict[equal_nodes_mapping[subtree_node]]) & set(children))[0]
+                                    target_child = list(set(lemma_nodeid_dict[equal_nodes_mapping[subtree_node]]) & children)[0]
                                 else:
+                                    if len(children_nodes) == 0:
+                                        children_nodes = Tree.get_children_nodes(whole_tree, children)
                                     target_child = children_nodes[subtree_node]
                             else:
-                                intersection = set(lemma_nodeid_dict[subtree_node]) & set(children)
+                                intersection = set(lemma_nodeid_dict[subtree_node]) & children
                                 if len(intersection) == 0:
+                                    if len(children_nodes) == 0:
+                                        children_nodes = Tree.get_children_nodes(whole_tree, children)
                                     target_child = children_nodes[subtree_node]
                                 else:
                                     target_child = list(intersection)[0]
@@ -497,15 +489,16 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
                             else:
                                 classes_subtreeid_nodes[subtree_new_label].append(new_node.id)
 
-                            subtree_deep_children = []
+                            subtree_deep_children = set()
                             for subtree_lemma in list(map(lambda x: Tree.get_node(whole_tree, x).lemma, subtree_children)):
                                 if subtree_lemma in classes_subtreeid_nodes_list.keys():
-                                    subtree_deep_children.extend(classes_subtreeid_nodes_list[subtree_lemma])
-                            subtree_deep_children.extend(subtree_children)
-                            only_active = list(filter(lambda x: x not in whole_tree.inactive, subtree_deep_children))
+                                    subtree_deep_children.update(classes_subtreeid_nodes_list[subtree_lemma])
+                            subtree_deep_children.update(subtree_children)
+                            only_active = subtree_deep_children - whole_tree.inactive
+                            # only_active = (whole_tree.inactive.symmetric_difference(set_children))&set_children
 
                             if subtree_new_label not in classes_subtreeid_nodes_list.keys():
-                                classes_subtreeid_nodes_list[subtree_new_label] = set(only_active)
+                                classes_subtreeid_nodes_list[subtree_new_label] = only_active
                             else:
                                 classes_subtreeid_nodes_list[subtree_new_label].update(only_active)
                             classes_subtreeid_nodes_list[subtree_new_label].add(new_node.id)
@@ -725,7 +718,7 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
 def main():
     trees_df_filtered = read_data()
     # # TEST - тест на первых 3х предложениях
-    trees_df_filtered = trees_df_filtered.head(5015)  # 341 - all? 48 - 3 # 3884 # 5015
+    trees_df_filtered = trees_df_filtered.head(7285)  # 341 - all? 48 - 3 # 3884 # 5015
     # # trees_df_filtered = trees_df_filtered[trees_df_filtered.sent_name == '48554_5']
     #
     # get all lemmas and create a dictionary to map to numbers
