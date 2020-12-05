@@ -11,17 +11,21 @@ from Util import radix_sort, sort_strings_inside, remap_s, new_test
 
 EMPTY_STR = ''
 
+
 def read_data():
     DATA_PATH = r'medicalTextTrees/parus_results'
     files = os.listdir(DATA_PATH)
-    trees_df = pd.DataFrame(columns=['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel'])
-
+    df_columns = ['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel']
+    # trees_df = pd.DataFrame(columns=df_columns)
+    full_df = []
+    stable_df = []
+    many_roots_df = []
+    very_long_df = []
     for file in files:
         full_dir = os.path.join(DATA_PATH, file)
         name = file.split('.')[0]
         with open(full_dir, encoding='utf-8') as f:
-            this_df = pd.read_csv(f, sep='\t',
-                                  names=['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel'])
+            this_df = pd.read_csv(f, sep='\t', names=df_columns)#, engine='c')
             if this_df['id'].duplicated().any():
                 start_of_subtree_df = list(this_df.groupby(this_df.id).get_group(1).index)
                 boundaries = start_of_subtree_df + [max(list(this_df.index)) + 1]
@@ -29,22 +33,46 @@ def read_data():
                 local_counter = 1
                 for df in list_of_dfs:
                     df['sent_name'] = name + '_' + str(local_counter)
-                    trees_df = pd.concat([trees_df, df], ignore_index=True)
+                    full_df.append(df)
+                    stable_df.append(df)
+                    # trees_df = pd.concat([trees_df, df], ignore_index=True)
                     local_counter += 1
             else:
                 this_df['sent_name'] = name
-                trees_df = pd.concat([trees_df, this_df], ignore_index=True)
+                this_df.drop(columns=['upostag', 'xpostag', 'feats'], axis=1)
+                this_df = this_df[this_df.deprel != 'PUNC']
+                if this_df.groupby(this_df.deprel).get_group('ROOT').shape[0] > 1:
+                    many_roots_df.append(this_df)
+                elif this_df.shape[0] > 18:
+                    very_long_df.append(this_df)
+                else:
+                    stable_df.append(this_df)
+                full_df.append(this_df)
+                # trees_df = pd.concat([trees_df, this_df], ignore_index=True)
+    trees_stable_df = pd.concat(stable_df, axis=0, ignore_index=True)
+    trees_stable_df = trees_stable_df.reset_index(drop=True)
+    trees_stable_df.index = trees_stable_df.index + 1
 
-    # delete useless data
-    trees_df = trees_df.drop(columns=['upostag', 'xpostag', 'feats'], axis=1)
-    trees_df.drop(index=[11067], inplace=True)
-    trees_df.loc[13742, 'deprel'] = 'разъяснит'
+    trees_full_df = pd.concat(full_df, axis=0, ignore_index=True)
+    trees_full_df = trees_full_df.reset_index(drop=True)
+    trees_full_df.index = trees_full_df.index + 1
 
-    # delete relations of type PUNC and reindex
-    trees_df_filtered = trees_df[trees_df.deprel != 'PUNC']
-    trees_df_filtered = trees_df_filtered.reset_index(drop=True)
-    trees_df_filtered.index = trees_df_filtered.index + 1
-    return trees_df_filtered
+    # trees_df_filtered = trees_df_filtered.reset_index(drop=True)
+    # trees_df_filtered.index = trees_df_filtered.index + 1
+    # # delete useless data
+    # # trees_df = trees_df.drop(columns=['upostag', 'xpostag', 'feats'], axis=1)
+    # # trees_df.drop(index=[11067], inplace=True)
+    # trees_df.loc[13742, 'deprel'] = 'разъяснит'
+    # trees_df_filtered = trees_df
+    # # delete relations of type PUNC and reindex
+    # # trees_df_filtered = trees_df[trees_df.deprel != 'PUNC']
+    # # trees_df_filtered = trees_df_filtered.loc[trees_df_filtered['sent_name'] != '37918_12']
+    # # trees_df_filtered = trees_df_filtered.loc[trees_df_filtered['sent_name'] != '38897_9'] # 1) very long sentence 2) 5 roots
+    # trees_df_filtered = trees_df_filtered.reset_index(drop=True)
+    # trees_df_filtered.index = trees_df_filtered.index + 1
+    # # trees_df_filtered.loc[12239, 'deprel'] = '1-компл'
+    # # trees_df_filtered.loc[12239, 'head'] = 2
+    return trees_full_df, trees_stable_df
 
 
 def train_word2vec(trees_df_filtered, lemmas):
@@ -216,13 +244,17 @@ def produce_combinations(k_2, v_id, str_sequence_help, str_sequence_help_reverse
         prepared_k_2 = set()
         included_labels = []
         for child_tree in k_2[v_id]:
-            if child_tree in [item for sublist in list(equal_nodes.values()) for item in sublist] or child_tree in equal_nodes.keys():
+            if child_tree in [item for sublist in list(equal_nodes.values()) for item in
+                              sublist] or child_tree in equal_nodes.keys():
                 if child_tree in equal_nodes_mapping.keys():
                     actual_label = equal_nodes_mapping[child_tree]
                 else:
                     actual_label = child_tree
                 if actual_label not in included_labels:
-                    list_for_combinations.append(equal_nodes[actual_label])
+                    if actual_label in equal_nodes.keys():
+                        list_for_combinations.append(equal_nodes[actual_label])
+                    else:
+                        list_for_combinations.append(equal_nodes[child_tree])
                     included_labels.append(actual_label)
             else:
                 prepared_k_2.add(child_tree)
@@ -716,16 +748,19 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
 
 
 def main():
-    trees_df_filtered = read_data()
+    start = time.time()
+    trees_full_df, trees_df_filtered = read_data()
+    print('Time on reading the data: ' + str(time.time() - start))
     # # TEST - тест на первых 3х предложениях
-    trees_df_filtered = trees_df_filtered.head(7285)  # 341 - all? 48 - 3 # 3884 # 5015
+    # trees_df_filtered = trees_df_filtered.head(10885)  # 341 - all? 48 - 3 # 3884 # 5015
     # # trees_df_filtered = trees_df_filtered[trees_df_filtered.sent_name == '48554_5']
     #
     # get all lemmas and create a dictionary to map to numbers
     dict_lemmas = {lemma: index for index, lemma in enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
+    dict_lemmas_full = {lemma: index for index, lemma in enumerate(dict.fromkeys(trees_full_df['lemma'].to_list()), 1)}
     # get all relations and create a dictionary to map to numbers
     dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
-    train_word2vec(trees_df_filtered, dict_lemmas)
+    train_word2vec(trees_full_df, dict_lemmas_full)
     #
     start = time.time()
     whole_tree = construct_tree(trees_df_filtered, dict_lemmas, dict_rel)
