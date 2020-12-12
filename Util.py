@@ -146,6 +146,7 @@ def new_test():
     Tree.add_node(test_tree, Node(17, lemma=7))
     Tree.add_node(test_tree, Node(18, lemma=19))
     Tree.add_node(test_tree, Node(19, lemma=8))
+    Tree.add_node(test_tree, Node(22, lemma=14))
     # add test edges
     Tree.add_edge(test_tree, Edge(0, 1, 0))
     Tree.add_edge(test_tree, Edge(0, 8, 0))
@@ -166,17 +167,17 @@ def new_test():
     Tree.add_edge(test_tree, Edge(16, 18, 9))
     Tree.add_edge(test_tree, Edge(16, 19, 20))
     Tree.add_edge(test_tree, Edge(8, 14, 2))
+    Tree.add_edge(test_tree, Edge(16, 22, 4))
 
     # additional
     Tree.add_node(test_tree, Node(20, lemma=14))
     Tree.add_node(test_tree, Node(21, lemma=9))
-    Tree.add_node(test_tree, Node(22, lemma=14))
 
     Tree.add_edge(test_tree, Edge(9, 20, 4))
     Tree.add_edge(test_tree, Edge(9, 21, 4))
-    Tree.add_edge(test_tree, Edge(16, 22, 4))
 
-    Tree.additional_nodes = {20, 21, 22}
+    test_tree.additional_nodes = {20, 21}
+    test_tree.similar_lemmas = {10: [20, 21]}
     return test_tree
 
 

@@ -31,13 +31,15 @@ class Tree:
         self.edges_dict_to = {}
         self.nodes_dict_id = {}
         self.additional_nodes = set()
+        self.similar_lemmas = {}
 
     def set_help_dict(self):
         self.edges_dict_from = {k: list(v) for k, v in itertools.groupby(sorted(self.edges, key=lambda x: x.node_from),
                                                                          key=lambda x: x.node_from)}
         self.nodes_dict_id = {node.id: node for node in self.nodes}
-        filtered_edges = list(filter(lambda x: x.node_to not in self.additional_nodes and x.node_from not in self.additional_nodes, self.edges))
-        self.edges_dict_to = {k: list(set(v) - self.additional_nodes) for k, v in itertools.groupby(filtered_edges, key=lambda x: x.node_to)}
+        self.edges_dict_to = {k: list(v) for k, v in itertools.groupby(self.edges, key=lambda x: x.node_to)}
+        # filtered_edges = list(filter(lambda x: x.node_to not in self.additional_nodes and x.node_from not in self.additional_nodes, self.edges))
+        # self.edges_dict_to = {k: list(set(v) - self.additional_nodes) for k, v in itertools.groupby(filtered_edges, key=lambda x: x.node_to)}
 
     def add_node(self, node):
         self.nodes.append(node)

@@ -120,7 +120,7 @@ def train_word2vec(trees_df_filtered, lemmas, dict_lemmas_3, part_of_speech_node
 
     model_2 = Word2Vec(min_count=1)
     model_2.build_vocab(sentences)
-    w2v_fpath = "additional_corpus/all.norm-sz100-w10-cb0-it1-min100.w2v"
+    w2v_fpath = "additionalCorpus/all_norm-sz100-w10-cb0-it1-min100.w2v"
 
     # model.intersect_word2vec_format
     # similar_dict = {}
@@ -268,6 +268,7 @@ def construct_tree(trees_df_filtered, dict_lemmas, dict_rel):
                     for similar_id in similar_ids:
                         Tree.add_edge(whole_tree, Edge(similar_id, child, edge_to_weight[main_id]))
     whole_tree.additional_nodes = set([sublist for list in similar_lemmas_dict.values() for sublist in list])
+    whole_tree.similar_lemmas = similar_lemmas_dict
     return whole_tree
 
 
@@ -285,6 +286,9 @@ def add_children_to_parents(k_2, filtered_groups, whole_tree, curr_height, old_n
                     lemmas_to_visit = old_node_new_nodes[v_id]
                 else:
                     lemmas_to_visit = [k]
+                if v_id in whole_tree.similar_lemmas.keys():
+                    for node_id in whole_tree.similar_lemmas[v_id]:
+                        lemmas_to_visit.append(Tree.get_node(whole_tree, node_id).lemma)
                 for lemma in lemmas_to_visit:
                     label_for_child = str(edge_to_curr[0].weight) + str(lemma)
                     if parent not in k_2.keys():
@@ -297,7 +301,7 @@ def add_children_to_parents(k_2, filtered_groups, whole_tree, curr_height, old_n
 def add_additional_children_to_parents(k_2, whole_tree, all_parents):
     additional_child_nodes = {}
     for parent in all_parents:
-        for child_id in Tree.get_children(whole_tree, parent) - whole_tree.additional_nodes:
+        for child_id in Tree.get_children(whole_tree, parent):# - whole_tree.additional_nodes:
             edge_to_curr = Tree.get_edge(whole_tree, child_id)[0]
             child_node = Tree.get_node(whole_tree, child_id)
             if not child_node.is_included:
@@ -435,9 +439,9 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
                         lemma_nodeid_dict[label_for_child] = {v_id}
                     else:
                         lemma_nodeid_dict[label_for_child].add(v_id)
-        filtered_groups = {k: v for k, v in grouped_lemmas.items() if len(v) > 1}
 
         if curr_height != 0:  # not applicable to leaves, leaves don't have subtrees
+            filtered_groups = {k: v for k, v in grouped_lemmas.items() if len(v) > 1}
             for lemma, ids in filtered_groups.items():
                 combination_ids = {}
                 str_sequence_help = {}
@@ -447,18 +451,24 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
                 for v_id in ids:
                     equal_nodes = {}
                     # only for duplicating nodes
-                    children = Tree.get_children(whole_tree, v_id) - whole_tree.created
+                    children = Tree.get_children(whole_tree, v_id) - whole_tree.created - whole_tree.additional_nodes
                     for child in children:
-                        if child in old_node_new_nodes.keys():
+                        if child in old_node_new_nodes.keys() or child in whole_tree.similar_lemmas.keys():
                             edge_to_child = Tree.get_edge(whole_tree, child)[0]
                             child_node = Tree.get_node(whole_tree, child)
                             w = str(edge_to_child.weight)
                             actual_label = w + str(child_node.lemma)
                             merge = []
-                            for l in old_node_new_nodes[child]:
-                                new_label = w + str(l)
-                                merge.append(new_label)
-                                equal_nodes_mapping[new_label] = actual_label
+                            if child in old_node_new_nodes.keys():
+                                for l in old_node_new_nodes[child]: # refactor this and below
+                                    new_label = w + str(l)
+                                    merge.append(new_label)
+                                    equal_nodes_mapping[new_label] = actual_label
+                            else:
+                                for node_id in whole_tree.similar_lemmas[child]:
+                                    new_label = w + str(Tree.get_node(whole_tree, node_id).lemma)
+                                    merge.append(new_label)
+                                    equal_nodes_mapping[new_label] = actual_label
                             if actual_label not in equal_nodes.keys():
                                 equal_nodes[actual_label] = merge
                             else:
@@ -586,7 +596,7 @@ def main():
     #     if num in dict_lemmas_3.keys():
     #         dict_lemmas_3[num] = numbers_one_lemma
     # get all relations and create a dictionary to map to numbers
-    # dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
+    # dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_full_df['deprel'].to_list()))}
     # dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(test_3_sent['deprel'].to_list()))}
     # train_word2vec(trees_full_df, dict_lemmas_full, dict_lemmas_3, part_of_speech_node_id)
 
@@ -594,7 +604,7 @@ def main():
     # start = time.time()
     # test_dict_lemmas = get_test_dict_lemmas()
     # new_test_dict = {k: test_dict_lemmas[i] for i, k in enumerate(dict_lemmas_3.keys())}
-    # whole_tree = construct_tree(test_3_sent, new_test_dict, dict_rel)
+    # whole_tree = construct_tree(trees_full_df, dict_lemmas_full, dict_rel)
     # print('Time on constructing the tree: ' + str(time.time() - start))
     whole_tree = new_test()
     Tree.set_help_dict(whole_tree)
