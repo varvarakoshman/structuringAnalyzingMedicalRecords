@@ -30,12 +30,14 @@ class Tree:
         self.edges_dict_from = {}
         self.edges_dict_to = {}
         self.nodes_dict_id = {}
+        self.additional_nodes = set()
 
     def set_help_dict(self):
         self.edges_dict_from = {k: list(v) for k, v in itertools.groupby(sorted(self.edges, key=lambda x: x.node_from),
                                                                          key=lambda x: x.node_from)}
         self.nodes_dict_id = {node.id: node for node in self.nodes}
-        self.edges_dict_to = {k: list(v) for k, v in itertools.groupby(self.edges, key=lambda x: x.node_to)}
+        filtered_edges = list(filter(lambda x: x.node_to not in self.additional_nodes and x.node_from not in self.additional_nodes, self.edges))
+        self.edges_dict_to = {k: list(set(v) - self.additional_nodes) for k, v in itertools.groupby(filtered_edges, key=lambda x: x.node_to)}
 
     def add_node(self, node):
         self.nodes.append(node)
@@ -100,6 +102,7 @@ class Tree:
             str(Tree.get_edge(self, child)[0].weight) + str(Tree.get_node(self, child).lemma): child for
             child in children}
         return children_nodes
+
     #
     # def remove_node(self, existing_node, existing_edge):
     #     self.nodes.remove(existing_node)
@@ -163,23 +166,53 @@ class Tree:
                 stack.get()
             else:
                 all_visited_flag = True
-                for child in children:
+                children_filtered = set(children) - self.additional_nodes
+                for child in children_filtered:
                     if not visited[child]:
                         all_visited_flag = False
                         stack.put(child)
                 if all_visited_flag:
                     curr_height = []
-                    if len(children) > 1:
-                        for child in children:
+                    if len(children_filtered) > 1:
+                        for child in children_filtered:
                             for child_height in self.heights[child]:
                                 curr_height.append(child_height + 1)
                     else:
-                        curr_height = [h + 1 for h in self.heights[prev]]
+                        try:
+                            curr_height = [h + 1 for h in self.heights[prev]]
+                        except KeyError as e:
+                            efl = []
                     self.heights[curr] = list(set(curr_height))
                     prev = curr
                     stack.get()
+    #
+    # def simple_dfs(self, vertex):
+    #     sequence = []
+    #     node = self.get_node(vertex)
+    #     if node is not None:
+    #         sequence.append(tuple([vertex, node.form, node.sent_name]))
+    #         visited = np.full(len(self.nodes), False, dtype=bool)
+    #         stack = [vertex]
+    #         while len(stack) > 0:
+    #             curr = stack[-1]
+    #             if not visited[curr]:
+    #                 visited[curr] = True
+    #             children = self.get_children(curr)
+    #             if len(children) == 0:
+    #                 stack.pop()
+    #             else:
+    #                 all_visited_flag = True
+    #                 for child in children:
+    #                     if not visited[child]:
+    #                         all_visited_flag = False
+    #                         stack.append(child)
+    #                         node = self.get_node(child)
+    #                         sequence.append(tuple([child, node.form, node.sent_name]))
+    #                 if all_visited_flag:
+    #                     stack.pop()
+    #     return sequence
 
-    def simple_dfs(self, vertex):
+    def simple_dfs(self, vertex, subtree_vertices):
         sequence = []
         node = self.get_node(vertex)
         if node is not None:
@@ -196,7 +229,7 @@ class Tree:
                 else:
                     all_visited_flag = True
                     for child in children:
-                        if not visited[child]:
+                        if child in subtree_vertices and not visited[child]:
                             all_visited_flag = False
                             stack.append(child)
                             node = self.get_node(child)

@@ -127,25 +127,25 @@ def new_test():
     # add root
     Tree.add_node(test_tree, root_node)
     # add test nodes
-    Tree.add_node(test_tree, Node(1, 18))
-    Tree.add_node(test_tree, Node(2, 20))
-    Tree.add_node(test_tree, Node(3, 3))
-    Tree.add_node(test_tree, Node(4, 19))
-    Tree.add_node(test_tree, Node(5, 5))
-    Tree.add_node(test_tree, Node(6, 6))
-    Tree.add_node(test_tree, Node(7, 8))
-    Tree.add_node(test_tree, Node(8, 18))
-    Tree.add_node(test_tree, Node(9, 20))
-    Tree.add_node(test_tree, Node(10, 3))
-    Tree.add_node(test_tree, Node(11, 4))
-    Tree.add_node(test_tree, Node(12, 7))
-    Tree.add_node(test_tree, Node(13, 19))
-    Tree.add_node(test_tree, Node(14, 2))
-    Tree.add_node(test_tree, Node(15, 18))
-    Tree.add_node(test_tree, Node(16, 20))
-    Tree.add_node(test_tree, Node(17, 7))
-    Tree.add_node(test_tree, Node(18, 19))
-    Tree.add_node(test_tree, Node(19, 8))
+    Tree.add_node(test_tree, Node(1, lemma=18))
+    Tree.add_node(test_tree, Node(2, lemma=20))
+    Tree.add_node(test_tree, Node(3, lemma=3))
+    Tree.add_node(test_tree, Node(4, lemma=19))
+    Tree.add_node(test_tree, Node(5, lemma=5))
+    Tree.add_node(test_tree, Node(6, lemma=6))
+    Tree.add_node(test_tree, Node(7, lemma=8))
+    Tree.add_node(test_tree, Node(8, lemma=18))
+    Tree.add_node(test_tree, Node(9, lemma=20))
+    Tree.add_node(test_tree, Node(10, lemma=3))
+    Tree.add_node(test_tree, Node(11, lemma=4))
+    Tree.add_node(test_tree, Node(12, lemma=7))
+    Tree.add_node(test_tree, Node(13, lemma=19))
+    Tree.add_node(test_tree, Node(14, lemma=2))
+    Tree.add_node(test_tree, Node(15, lemma=18))
+    Tree.add_node(test_tree, Node(16, lemma=20))
+    Tree.add_node(test_tree, Node(17, lemma=7))
+    Tree.add_node(test_tree, Node(18, lemma=19))
+    Tree.add_node(test_tree, Node(19, lemma=8))
     # add test edges
     Tree.add_edge(test_tree, Edge(0, 1, 0))
     Tree.add_edge(test_tree, Edge(0, 8, 0))
@@ -166,4 +166,33 @@ def new_test():
     Tree.add_edge(test_tree, Edge(16, 18, 9))
     Tree.add_edge(test_tree, Edge(16, 19, 20))
     Tree.add_edge(test_tree, Edge(8, 14, 2))
+
+    # additional
+    Tree.add_node(test_tree, Node(20, lemma=14))
+    Tree.add_node(test_tree, Node(21, lemma=9))
+    Tree.add_node(test_tree, Node(22, lemma=14))
+
+    Tree.add_edge(test_tree, Edge(9, 20, 4))
+    Tree.add_edge(test_tree, Edge(9, 21, 4))
+    Tree.add_edge(test_tree, Edge(16, 22, 4))
+
+    Tree.additional_nodes = {20, 21, 22}
     return test_tree
+
+
+def get_test_dict_lemmas():
+    # 'в' - 0
+    # '#мес€ц' -1
+    # '#год' - 2
+    # 'год' - 3
+    # 'находитьс€' - 4
+    # 'на' - 5
+    # 'лечение' - 6
+    # 'нрс' - 7
+    # 'провести' - 8
+    # 'операци€' - 9
+    # 'MAZE' - 10
+    test_dict_lemmas = {0: [1, 70, 63, 32], 1: [2], 2: [2], 3: [4, 1438, 109, 157, 73, 66, 311],
+                        4: [5, 35, 69], 5: [6, 32, 63], 6: [7, 217, 232, 89], 7: [8],
+                        8: [9, 115, 69, 170, 1775], 9: [10], 10: [11, 521, 325]}
+    return test_dict_lemmas
