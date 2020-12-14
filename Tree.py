@@ -32,6 +32,7 @@ class Tree:
         self.nodes_dict_id = {}
         self.additional_nodes = set()
         self.similar_lemmas = {}
+        self.global_similar_mapping = {}
 
     def set_help_dict(self):
         self.edges_dict_from = {k: list(v) for k, v in itertools.groupby(sorted(self.edges, key=lambda x: x.node_from),
@@ -151,7 +152,8 @@ class Tree:
     #                 stack.get()
 
     def calculate_heights(self):
-        visited = np.full(len(self.nodes), False, dtype=bool)
+        # visited = np.full(len(self.nodes), False, dtype=bool)
+        visited = {node.id: False for node in self.nodes}
         # self.heights = np.full(len(self.nodes), -1, dtype=int)  # all heights are -1 initially
         stack = LifoQueue()
         stack.put(0)
@@ -170,9 +172,12 @@ class Tree:
                 all_visited_flag = True
                 children_filtered = set(children) - self.additional_nodes
                 for child in children_filtered:
-                    if not visited[child]:
-                        all_visited_flag = False
-                        stack.put(child)
+                    try:
+                        if not visited[child]:
+                            all_visited_flag = False
+                            stack.put(child)
+                    except IndexError as ie:
+                        ff = []
                 if all_visited_flag:
                     curr_height = []
                     if len(children_filtered) > 1:
@@ -218,8 +223,9 @@ class Tree:
         sequence = []
         node = self.get_node(vertex)
         if node is not None:
-            sequence.append(tuple([vertex, node.form, node.sent_name]))
-            visited = np.full(len(self.nodes), False, dtype=bool)
+            sequence.append(tuple([vertex, node.lemma, node.form, node.sent_name]))
+            # visited = np.full(len(self.nodes), False, dtype=bool)
+            visited = {node.id: False for node in self.nodes}
             stack = [vertex]
             while len(stack) > 0:
                 curr = stack[-1]
@@ -235,7 +241,7 @@ class Tree:
                             all_visited_flag = False
                             stack.append(child)
                             node = self.get_node(child)
-                            sequence.append(tuple([child, node.form, node.sent_name]))
+                            sequence.append(tuple([child, node.lemma, node.form, node.sent_name]))
                     if all_visited_flag:
                         stack.pop()
         return sequence

@@ -1,3 +1,4 @@
+import os
 from collections import defaultdict
 import numpy as np
 
@@ -181,19 +182,21 @@ def new_test():
     return test_tree
 
 
-def get_test_dict_lemmas():
-    # 'в' - 0
-    # '#мес€ц' -1
-    # '#год' - 2
-    # 'год' - 3
-    # 'находитьс€' - 4
-    # 'на' - 5
-    # 'лечение' - 6
-    # 'нрс' - 7
-    # 'провести' - 8
-    # 'операци€' - 9
-    # 'MAZE' - 10
-    test_dict_lemmas = {0: [1, 70, 63, 32], 1: [2], 2: [2], 3: [4, 1438, 109, 157, 73, 66, 311],
-                        4: [5, 35, 69], 5: [6, 32, 63], 6: [7, 217, 232, 89], 7: [8],
-                        8: [9, 115, 69, 170, 1775], 9: [10], 10: [11, 521, 325]}
-    return test_dict_lemmas
+def merge_in_file():
+    DATA_PATH = r'medicalTextTrees/results_plain_no_word2vec'
+    PATH_MERGED = 'medicalTextTrees/merged_mess.txt'
+    files = sorted(os.listdir(DATA_PATH))
+    writer = open(PATH_MERGED, 'w', encoding='utf-8')
+    try:
+        for file in files:
+            full_dir = os.path.join(DATA_PATH, file)
+            try:
+                with open(full_dir, encoding='utf-8') as reader:
+                    class_entries = reader.readlines()
+            finally:
+                reader.close()
+            for entry in class_entries:
+                writer.write(entry)
+            writer.write('\n')
+    finally:
+        writer.close()
