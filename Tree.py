@@ -1,6 +1,5 @@
-import numpy as np
-from queue import LifoQueue
 import itertools
+from queue import LifoQueue
 
 
 class Node:
