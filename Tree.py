@@ -62,13 +62,11 @@ class Tree:
     def remove_edge(self, to_id):
         self.edges = list(filter(lambda x: x.node_to != to_id, self.edges))
 
-    def copy_node_details(self, existing_node):
-        new_node = Node(id=len(self.nodes),
+    def copy_node_details(self, existing_node, id_count):
+        new_node = Node(id=id_count,
                     form=existing_node.form,
                     sent_name=existing_node.sent_name,
                     is_included=existing_node.is_included)
-        self.nodes_dict_id[new_node.id] = new_node
-        self.created.add(new_node.id)
         return new_node
 
     def add_new_edges(self, new_node_id, children):
@@ -83,8 +81,16 @@ class Tree:
                 self.edges_dict_from[new_node_id].append(new_edge)
             else:
                 self.edges_dict_from[new_node_id] = [new_edge]
+            # if new_edge.node_to not in self.edges_dict_to.keys():
+            #     self.edges_dict_to[new_edge.node_to] = [new_edge]
+            # else:
+            #     self.edges_dict_to[new_edge.node_to].append(new_edge)
 
     def add_edge_to_dict(self, edge):
+        # if edge.node_to not in self.edges_dict_to.keys():
+        #     self.edges_dict_to[edge.node_to] = [edge]
+        # else:
+        #     self.edges_dict_to[edge.node_to].append(edge)
         self.edges_dict_to[edge.node_to] = [edge]
         if edge.node_from in self.edges_dict_from.keys():
             self.edges_dict_from[edge.node_from].append(edge)
@@ -94,6 +100,7 @@ class Tree:
 
     def add_node_to_dict(self, node):
         self.nodes_dict_id[node.id] = node
+        self.created.add(node.id)
         self.nodes.append(node)
 
     def add_inactive(self, node_id):

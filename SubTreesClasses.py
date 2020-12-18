@@ -89,6 +89,8 @@ def read_data():
 
     # target_sents = list({'55338_41', '58401_7', '32384_8', '31736_14', '48714_8', '54996_6'}) # TEST
     # target_sents = list({'55338_41', '58401_7'})  # TEST
+    # target_sents = list({'32191_2', '58282_3', '55066_0', '46855_3', '48408_0', '37676_3',
+    #                      '32191_0', '56109_5', '56661_0', '54743_1'})
     # trees_df_filtered = trees_df_filtered.loc[trees_df_filtered.sent_name.isin(target_sents)] # TEST
 
     # trees_full_df.loc[trees_full_df.index.isin(replaced_numbers)].assign(upostag = 'N')
@@ -228,8 +230,8 @@ def construct_tree(trees_df_filtered, dict_lemmas, dict_rel, dict_lemmas_rev):
     whole_tree = Tree()
     root_node = Node(0, 0)  # add root
     Tree.add_node(whole_tree, root_node)
-    new_id_count = len(trees_df_filtered) + 1
-    # new_id_count = 1
+    # new_id_count = len(trees_df_filtered) + 1
+    new_id_count = 1
     similar_lemmas_dict = {}
     global_similar_mapping = {}
     for name, group in trees_df_filtered.groupby('sent_name'):
@@ -295,6 +297,8 @@ def add_children_to_parents(k_2, filtered_groups, whole_tree, curr_height, old_n
             Tree.get_node(whole_tree, v_id).is_included = True
             if edge_to_curr is not None:
                 parent = edge_to_curr[0].node_from
+                if parent == 542:
+                    ffj = []
                 try:
                     if parent not in whole_tree.heights.keys(): # same as in whole_tree.additional
                         parent = whole_tree.global_similar_mapping[parent]
@@ -311,8 +315,6 @@ def add_children_to_parents(k_2, filtered_groups, whole_tree, curr_height, old_n
                         lemmas_to_visit.append(Tree.get_node(whole_tree, node_id).lemma)
                 for lemma in lemmas_to_visit:
                     label_for_child = str(edge_to_curr[0].weight) + str(lemma)
-                    if parent == 8618:
-                        ffj = []
                     if parent not in k_2.keys():
                         k_2[parent] = {label_for_child}
                     else:
@@ -328,6 +330,8 @@ def add_additional_children_to_parents(k_2, whole_tree, all_parents):
             child_node = Tree.get_node(whole_tree, child_id)
             if not child_node.is_included:
                 label_for_child = str(edge_to_curr.weight) + str(child_node.lemma)
+                if parent == 542:
+                    ffj = []
                 k_2[parent].add(label_for_child)
                 child_node.is_included = True
                 if parent not in additional_child_nodes.keys():
@@ -342,6 +346,10 @@ def produce_combinations(k_2, v_id, str_sequence_help, str_sequence_help_reverse
         list_for_combinations = []
         prepared_k_2 = set()
         included_labels = []
+        try:
+            n = k_2[v_id]
+        except KeyError as ke:
+            jkjk =[]
         for child_tree in k_2[v_id]:
             if child_tree in [item for sublist in list(equal_nodes.values()) for item in
                               sublist] or child_tree in equal_nodes.keys():
@@ -367,29 +375,53 @@ def produce_combinations(k_2, v_id, str_sequence_help, str_sequence_help_reverse
             for l in combinations_repeated:
                 all_combinations.extend(list(combinations(list(l), i)) for i in range(1, len(list(l)) + 1))
     else:
+        try:
+            n = k_2[v_id]
+        except KeyError as ke:
+            jkjk = []
         list_for_combinations = k_2[v_id]
         all_combinations = [list(combinations(list_for_combinations, i)) for i in
                             range(1, len(list_for_combinations) + 1)]
     all_combinations_str_joined = set()
+    new_local_duplicates = {}
     for comb in all_combinations:
         for tup in comb:
             combs = [str(item) for item in sorted(list(tup))]
             joined_label = EMPTY_STR.join(combs)
+            if joined_label == '1226':
+                jk = []
+            joined_label = EMPTY_STR.join(combs)
             if joined_label not in str_sequence_help.keys():
-                str_sequence_help[joined_label] = combs
+                str_sequence_help[joined_label] = [str(item) for item in sorted(list(tup))]
                 str_sequence_help_reversed[tuple(combs)] = joined_label
             all_combinations_str_joined.add(joined_label)
-    return all_combinations_str_joined
+            if joined_label not in str_sequence_help.keys():
+                str_sequence_help[joined_label] = [[str(item) for item in sorted(list(tup))]]
+            else:
+                new_local_duplicates[v_id] = [str(item) for item in sorted(list(tup))]
+                str_sequence_help[joined_label].append([str(item) for item in sorted(list(tup))])
+            try:
+                str_sequence_help_reversed[tuple([str(item) for item in sorted(list(tup))])] = joined_label
+            except TypeError as te:
+                ff = []
+            all_combinations_str_joined.add(joined_label)
+    return all_combinations_str_joined, new_local_duplicates
 
 
-def get_nodeid_repeats(filtered_combination_ids, str_sequence_help):
+def get_nodeid_repeats(filtered_combination_ids, str_sequence_help, duplicate_combs):
     dict_nodeid_comb = {}
     for k, v in filtered_combination_ids.items():
         for v_i in v:
-            if v_i in dict_nodeid_comb.keys():
-                dict_nodeid_comb[v_i].append(str_sequence_help.get(k))
+            if v_i == 542:
+                iejf = []
+            if len(str_sequence_help.get(k)) > 1:
+                subtree_comb = duplicate_combs[v_i]
             else:
-                dict_nodeid_comb[v_i] = [str_sequence_help.get(k)]
+                subtree_comb = str_sequence_help.get(k)[0]
+            if v_i in dict_nodeid_comb.keys():
+                dict_nodeid_comb[v_i].append(subtree_comb)
+            else:
+                dict_nodeid_comb[v_i] = [subtree_comb]
     return dict_nodeid_comb
 
 
@@ -403,6 +435,7 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
     k_2 = {}  # identifiers of edges of subtrees
     lemma_nodeid_dict = {}
     saved_combinations = []
+    id_count = sorted([node.id for node in whole_tree.nodes], reverse=True)[0] + 1
     for nodes in grouped_heights:
         curr_height = nodes[0]
         print(curr_height)
@@ -434,7 +467,7 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
                 combination_ids = {}
                 str_sequence_help = {}
                 str_sequence_help_reversed = {}
-
+                duplicate_combs = {} # for several cases
                 # generate combinations
                 for v_id in ids:
                     equal_nodes = {}
@@ -452,7 +485,7 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
                                     new_label = w + str(l)
                                     merge.append(new_label)
                                     equal_nodes_mapping[new_label] = actual_label
-                            else:
+                            if child in whole_tree.similar_lemmas.keys():
                                 merge.append(actual_label)
                                 for node_id in whole_tree.similar_lemmas[child]:
                                     new_label = w + str(Tree.get_node(whole_tree, node_id).lemma)
@@ -462,9 +495,7 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
                                 equal_nodes[actual_label] = merge
                             else:
                                 equal_nodes[actual_label].extend(merge)
-                    if curr_height == 1 and v_id == 8618:
-                        ioij = []
-                    all_combinations_str_joined = produce_combinations(k_2, v_id, str_sequence_help,
+                    all_combinations_str_joined, new_local_duplicates = produce_combinations(k_2, v_id, str_sequence_help,
                                                                        str_sequence_help_reversed, equal_nodes,
                                                                        equal_nodes_mapping)
                     for label in all_combinations_str_joined:
@@ -473,6 +504,13 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
                         else:
                             combination_ids[label] = [v_id]
 
+                    for id, comb_list in new_local_duplicates.items():
+                        duplicate_combs[id] = comb_list
+                        str_tree_label = str(lemma) + EMPTY_STR.join(comb_list)
+                        if str_tree_label not in unique_subtrees_mapped_global_subtree_lemma.keys():
+                            unique_subtrees_mapped_global_subtree_lemma[str_tree_label] = lemma_count
+                            lemma_count += 1
+
                 filtered_combination_ids = {k: v for k, v in combination_ids.items() if len(v) > 1}
                 for tree_label, node_list in filtered_combination_ids.items():
                     str_tree_label = str(lemma) + tree_label
@@ -480,7 +518,7 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
                         unique_subtrees_mapped_global_subtree_lemma[str_tree_label] = lemma_count
                         lemma_count += 1
                 # 16: [['107', '919'], ['208', '919'], ['919'], ['107'], ['208']]
-                dict_nodeid_comb = get_nodeid_repeats(filtered_combination_ids, str_sequence_help)
+                dict_nodeid_comb = get_nodeid_repeats(filtered_combination_ids, str_sequence_help, duplicate_combs)
                 for node_id, node_subtrees in dict_nodeid_comb.items():
                     existing_node = Tree.get_node(whole_tree, node_id)
                     edge_to_curr = Tree.get_edge(whole_tree, node_id)[0]
@@ -488,10 +526,12 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
                     for subtree in node_subtrees:
                         subtree_text = str_sequence_help_reversed.get(tuple(subtree))
                         subtree_new_label = unique_subtrees_mapped_global_subtree_lemma.get(str(lemma) + subtree_text)
-
+                        if subtree_new_label is None:
+                            jfjdfi = []
                         if subtree_new_label not in subtree_label_sent.keys() or existing_node.sent_name not in subtree_label_sent[subtree_new_label]:
                             # add new node with a new lemma
-                            new_node = Tree.copy_node_details(whole_tree, existing_node)
+                            new_node = Tree.copy_node_details(whole_tree, existing_node, id_count)
+                            id_count += 1
                             new_node.lemma = subtree_new_label
                             Tree.add_node_to_dict(whole_tree, new_node)
                             whole_tree.global_similar_mapping[new_node.id] = new_node.id
@@ -520,12 +560,18 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
                             subtree_children = []
                             children_nodes = {}
                             for subtree_node in subtree:
-                                if subtree_node not in lemma_nodeid_dict.keys():
+                                if subtree_node not in lemma_nodeid_dict.keys() or subtree_node in equal_nodes_mapping.keys():
                                     if subtree_node in equal_nodes_mapping.keys():
-                                        try:
-                                            target_child = list(set(lemma_nodeid_dict[equal_nodes_mapping[subtree_node]]) & children)[0]
-                                        except IndexError as ie:
-                                            jjhj = []
+                                       target_child_list = list(set(lemma_nodeid_dict[equal_nodes_mapping[subtree_node]]) & children)
+                                       if len(target_child_list) > 0:
+                                            try:
+                                                target_child = target_child_list[0]
+                                            except IndexError as ie:
+                                                hjh = []
+                                       else:
+                                           if len(children_nodes) == 0:
+                                               children_nodes = Tree.get_children_nodes(whole_tree, children)
+                                           target_child = children_nodes[subtree_node]
                                     else:
                                         if len(children_nodes) == 0:
                                             children_nodes = Tree.get_children_nodes(whole_tree, children)
@@ -535,19 +581,15 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
                                     if len(intersection) == 0:
                                         if len(children_nodes) == 0:
                                             children_nodes = Tree.get_children_nodes(whole_tree, children)
-                                        try:
-                                            target_child = children_nodes[subtree_node]
-                                        except KeyError as ke:
-                                            gh = []
+                                        target_child = children_nodes[subtree_node]
                                     else:
                                         target_child = list(intersection)[0]
                                 subtree_children.append(target_child)
-
                             if len(subtree_children) > 0:
                                 try:
                                     general_comb = ''.join(sorted([str(whole_tree.global_similar_mapping[child_id]) for child_id in subtree_children]))
                                 except KeyError as ke:
-                                    sdfjkvnhdfbkdvi = []
+                                    jjij = []
                                 if general_comb not in saved_combinations:
                                     # add edges to subtree's children from new node
                                     Tree.add_new_edges(whole_tree, new_node.id, subtree_children)
@@ -684,7 +726,7 @@ def main():
         for vertex in v:
             vertex_seq[vertex] = Tree.simple_dfs(whole_tree, vertex, classes_part_list[k])
         if len(vertex_seq.items()) > 0:
-            filename = 'medicalTextTrees/results_part_new/results_%s.txt' % (str(k))
+            filename = 'medicalTextTrees/results_part_test_plain/results_%s.txt' % (str(k))
             try:
                 with open(filename, 'w', encoding='utf-8') as filehandle:
                     for key, value in vertex_seq.items():
