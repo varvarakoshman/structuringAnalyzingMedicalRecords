@@ -230,8 +230,8 @@ def construct_tree(trees_df_filtered, dict_lemmas, dict_rel, dict_lemmas_rev):
     whole_tree = Tree()
     root_node = Node(0, 0)  # add root
     Tree.add_node(whole_tree, root_node)
-    # new_id_count = len(trees_df_filtered) + 1
-    new_id_count = 1
+    new_id_count = len(trees_df_filtered) + 1
+    # new_id_count = 1 - test!
     similar_lemmas_dict = {}
     global_similar_mapping = {}
     for name, group in trees_df_filtered.groupby('sent_name'):
