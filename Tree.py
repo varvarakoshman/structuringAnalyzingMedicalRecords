@@ -33,13 +33,19 @@ class Tree:
         self.similar_lemmas = {}
         self.global_similar_mapping = {}
 
+    @staticmethod
+    def copy_node_details(existing_node, id_count):
+        new_node = Node(id=id_count,
+                    form=existing_node.form,
+                    sent_name=existing_node.sent_name,
+                    is_included=existing_node.is_included)
+        return new_node
+
     def set_help_dict(self):
         self.edges_dict_from = {k: list(v) for k, v in itertools.groupby(sorted(self.edges, key=lambda x: x.node_from),
                                                                          key=lambda x: x.node_from)}
         self.nodes_dict_id = {node.id: node for node in self.nodes}
         self.edges_dict_to = {k: list(v) for k, v in itertools.groupby(self.edges, key=lambda x: x.node_to)}
-        # filtered_edges = list(filter(lambda x: x.node_to not in self.additional_nodes and x.node_from not in self.additional_nodes, self.edges))
-        # self.edges_dict_to = {k: list(set(v) - self.additional_nodes) for k, v in itertools.groupby(filtered_edges, key=lambda x: x.node_to)}
 
     def add_node(self, node):
         self.nodes.append(node)
@@ -50,24 +56,15 @@ class Tree:
     def get_node(self, node_id):
         return self.nodes_dict_id.get(node_id)  # return Node class instance
 
-    def get_children(self, node_id):
-        edges = self.edges_dict_from.get(node_id)
-        # only_active = list(filter(lambda edge: edge.node_to not in self.inactive and edge.node_from not in self.inactive, edges if edges is not None else []))
-        # return list(map(lambda x: x.node_to, only_active if only_active is not None else []))
-        return set(map(lambda x: x.node_to, edges if edges is not None else []))
-
     def get_edge(self, to_id):
         return self.edges_dict_to.get(to_id)
 
     def remove_edge(self, to_id):
         self.edges = list(filter(lambda x: x.node_to != to_id, self.edges))
 
-    def copy_node_details(self, existing_node, id_count):
-        new_node = Node(id=id_count,
-                    form=existing_node.form,
-                    sent_name=existing_node.sent_name,
-                    is_included=existing_node.is_included)
-        return new_node
+    def get_children(self, node_id):
+        edges = self.edges_dict_from.get(node_id)
+        return set(map(lambda x: x.node_to, edges if edges is not None else []))
 
     def add_new_edges(self, new_node_id, children):
         for child_id in children:
@@ -81,16 +78,8 @@ class Tree:
                 self.edges_dict_from[new_node_id].append(new_edge)
             else:
                 self.edges_dict_from[new_node_id] = [new_edge]
-            # if new_edge.node_to not in self.edges_dict_to.keys():
-            #     self.edges_dict_to[new_edge.node_to] = [new_edge]
-            # else:
-            #     self.edges_dict_to[new_edge.node_to].append(new_edge)
 
     def add_edge_to_dict(self, edge):
-        # if edge.node_to not in self.edges_dict_to.keys():
-        #     self.edges_dict_to[edge.node_to] = [edge]
-        # else:
-        #     self.edges_dict_to[edge.node_to].append(edge)
         self.edges_dict_to[edge.node_to] = [edge]
         if edge.node_from in self.edges_dict_from.keys():
             self.edges_dict_from[edge.node_from].append(edge)
@@ -112,55 +101,19 @@ class Tree:
             child in children}
         return children_nodes
 
-    #
-    # def remove_node(self, existing_node, existing_edge):
-    #     self.nodes.remove(existing_node)
-    #     self.nodes_dict_id.pop(existing_node.id)
-    #     self.edges_dict_from.pop(existing_node.id)
-    #     self.edges_dict_to.pop(existing_node.id)
-    #     old_edge = list(filter(lambda x: x.node_to == existing_node.id, self.edges_dict_from[existing_edge.node_from]))
-    #     if len(old_edge) > 0:
-    #         self.edges_dict_from[existing_edge.node_from].remove(old_edge)
+    def create_new_node(self, new_id, lemma, form, sent, weight, from_id):
+        new_node = Node(new_id, lemma, form, sent)
+        Tree.add_node(self, new_node)
+        new_edge = Edge(from_id, new_id, weight)
+        Tree.add_edge(self, new_edge)
 
-    # def calculate_heights(self):
-    #     visited = np.full(len(self.nodes), False, dtype=bool)
-    #     self.heights = np.full(len(self.nodes), -1, dtype=int)  # all heights are -1 initially
-    #     stack = LifoQueue()
-    #     stack.put(0)
-    #     prev = None
-    #     while stack.qsize() > 0:
-    #         curr = stack.get()
-    #         stack.put(curr)
-    #         if not visited[curr]:
-    #             visited[curr] = True
-    #         children = self.get_children(curr)
-    #         if len(children) == 0:
-    #             self.heights[curr] = 0
-    #             prev = curr
-    #             stack.get()
-    #         else:
-    #             all_visited_flag = True
-    #             for child in children:
-    #                 if not visited[child]:
-    #                     all_visited_flag = False
-    #                     stack.put(child)
-    #             if all_visited_flag:
-    #                 if len(children) > 1:
-    #                     max_height = -1
-    #                     for child in children:
-    #                         if self.heights[child] > max_height:
-    #                             max_height = self.heights[child]
-    #                     curr_height = max_height + 1
-    #                 else:
-    #                     curr_height = self.heights[prev] + 1
-    #                 self.heights[curr] = curr_height
-    #                 prev = curr
-    #                 stack.get()
+    def get_target_from_children(self, children_nodes, children, subtree_node):
+        if len(children_nodes) == 0:
+            children_nodes = Tree.get_children_nodes(self, children)
+        return children_nodes[subtree_node]
 
     def calculate_heights(self):
-        # visited = np.full(len(self.nodes), False, dtype=bool)
         visited = {node.id: False for node in self.nodes}
-        # self.heights = np.full(len(self.nodes), -1, dtype=int)  # all heights are -1 initially
         stack = LifoQueue()
         stack.put(0)
         prev = None
@@ -178,12 +131,9 @@ class Tree:
                 all_visited_flag = True
                 children_filtered = set(children) - self.additional_nodes
                 for child in children_filtered:
-                    try:
-                        if not visited[child]:
-                            all_visited_flag = False
-                            stack.put(child)
-                    except IndexError as ie:
-                        ff = []
+                    if not visited[child]:
+                        all_visited_flag = False
+                        stack.put(child)
                 if all_visited_flag:
                     curr_height = []
                     if len(children_filtered) > 1:
@@ -191,46 +141,16 @@ class Tree:
                             for child_height in self.heights[child]:
                                 curr_height.append(child_height + 1)
                     else:
-                        try:
-                            curr_height = [h + 1 for h in self.heights[prev]]
-                        except KeyError as e:
-                            efl = []
+                        curr_height = [h + 1 for h in self.heights[prev]]
                     self.heights[curr] = list(set(curr_height))
                     prev = curr
                     stack.get()
-    #
-    # def simple_dfs(self, vertex):
-    #     sequence = []
-    #     node = self.get_node(vertex)
-    #     if node is not None:
-    #         sequence.append(tuple([vertex, node.form, node.sent_name]))
-    #         visited = np.full(len(self.nodes), False, dtype=bool)
-    #         stack = [vertex]
-    #         while len(stack) > 0:
-    #             curr = stack[-1]
-    #             if not visited[curr]:
-    #                 visited[curr] = True
-    #             children = self.get_children(curr)
-    #             if len(children) == 0:
-    #                 stack.pop()
-    #             else:
-    #                 all_visited_flag = True
-    #                 for child in children:
-    #                     if not visited[child]:
-    #                         all_visited_flag = False
-    #                         stack.append(child)
-    #                         node = self.get_node(child)
-    #                         sequence.append(tuple([child, node.form, node.sent_name]))
-    #                 if all_visited_flag:
-    #                     stack.pop()
-    #     return sequence
 
     def simple_dfs(self, vertex, subtree_vertices):
         sequence = []
         node = self.get_node(vertex)
         if node is not None:
             sequence.append(tuple([vertex, node.lemma, node.form, node.sent_name]))
-            # visited = np.full(len(self.nodes), False, dtype=bool)
             visited = {node.id: False for node in self.nodes}
             stack = [vertex]
             while len(stack) > 0:

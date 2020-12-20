@@ -1,89 +1,79 @@
 import os
-from collections import defaultdict
-import numpy as np
+import shutil
 
-# input: map_dict - {v.id: str value of mapped string}
-# returns: sorted_res - {v.id: str value of mapped string} in sorted order
 import pandas as pd
 
-from Tree import Tree, Node, Edge
-import shutil
 from Constants import *
+from Tree import Tree, Node, Edge
+import csv
 
 
-def radix_sort(map_dict):
-    if len(map_dict) == 0:
-        return map_dict
-    map_dict_rev = defaultdict(list)  # reversed: {str value of mapped string: [v.id]}
-    for key, val in map_dict.items():
-        map_dict_rev[val].append(key)
-    n_digits = max(list(map(lambda x: len(x), map_dict_rev.keys())))  # max N of digits
-    numbers = list(map_dict_rev.keys())
-    b = numbers.copy()  # array for intermediate results_part_new
-    upper_bound = 10
-    for i in range(n_digits):
-        c = np.zeros(upper_bound, dtype=int)  # temp array
-        for j in range(len(numbers)):
-            d = int(numbers[j]) // pow(10, i)
-            c[d % 10] += 1
-        cnt = 0
-        for j in range(upper_bound):
-            tmp = c[j]
-            c[j] = cnt
-            cnt += tmp
-        for j in range(len(numbers)):
-            d = int(numbers[j]) // pow(10, i)
-            b[c[d % 10]] = numbers[j]
-            c[d % 10] += 1
-        numbers = b.copy()
-    sorted_res = {list_item: number for number in numbers for list_item in map_dict_rev[number]}
-    return sorted_res
+def create_needed_directories():
+    if not os.path.exists(CLASSIFIED_DATA_PATH):
+        os.makedirs(CLASSIFIED_DATA_PATH)
+    if not os.path.exists(LONG_DATA_PATH):
+        os.makedirs(LONG_DATA_PATH)
+    if not os.path.exists(STABLE_DATA_PATH):
+        os.makedirs(STABLE_DATA_PATH)
+    if not os.path.exists(MANY_ROOTS_DATA_PATH):
+        os.makedirs(MANY_ROOTS_DATA_PATH)
+    if not os.path.exists(RESULT_PATH):
+        os.makedirs(RESULT_PATH)
 
 
-# from https://stackoverflow.com/questions/18262306/quicksort-with-python
-def quick_sort(array):
-    less = []
-    equal = []
-    greater = []
-    if len(array) > 1:
-        pivot = array[0]
-        for x in array:
-            if x < pivot:
-                less.append(x)
-            elif x == pivot:
-                equal.append(x)
-            elif x > pivot:
-                greater.append(x)
-        return quick_sort(less) + equal + quick_sort(greater)
-    else:
-        return array
+def write_tree_in_table(whole_tree):
+    with open(EXCEL_EDGES_GEPHI_PATH, "w", newline='', encoding='utf-8') as csv_file_1, open(
+            EXCEL_NODES_GEPHI_PATH, "w", newline='', encoding='utf-8') as csv_file_2:
+        writer_1 = csv.writer(csv_file_1, delimiter=',')
+        writer_2 = csv.writer(csv_file_2, delimiter=',')
+        writer_1.writerow(['Source', 'Target', 'Weight'])
+        writer_2.writerow(['Id', 'Label'])
+        for edge in whole_tree.edges:
+            writer_1.writerow([edge.node_from, edge.node_to, edge.weight + 1])
+        for node in whole_tree.nodes:
+            writer_2.writerow([node.id, (node.lemma, node.form, node.sent_name)])
+
+# PRE-PROCESSING
+# method splits input data in 3 datasets:
+# 1) stable (ready to run an algorithm),
+# 2) very long-read (sentences are too long and need to be split in 2 parts),
+# 3) many-rooted (case for compound sentences and incorrect parser's results (Ex: 5 roots in a sentence of length 10)
+# and copies files in corresponding directories
+# fix 2) and 3) manually and then run the main algorithm, which will walk through these directories and add all files.
+def sort_the_data():
+    files = os.listdir(DATA_PATH)
+    df_columns = ['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel']
+    for file in files:
+        full_dir = os.path.join(DATA_PATH, file)
+        with open(full_dir, encoding='utf-8') as f:
+            this_df = pd.read_csv(f, sep='\t', names=df_columns)
+            this_df = this_df[this_df.deprel != 'PUNC']
+        if this_df.groupby(this_df.deprel).get_group('ROOT').shape[0] > 1:
+            shutil.copy(full_dir, MANY_ROOTS_DATA_PATH)
+        elif this_df.shape[0] > 21:
+            name_split = file.split(DOT)
+            shutil.copy(os.path.join(ORIGINAL_DATA_PATH, DOT.join([name_split[0], name_split[1]])), LONG_DATA_PATH)
+        else:
+            shutil.copy(full_dir, STABLE_DATA_PATH)
 
 
-# input: remapped_dict - dictionary {v.id: int array of mapped string}
-# returns: sorted_res - dictionary {v.id: str value of mapped string}
-def sort_strings_inside(remapped_dict):
-    sorted_res = {}
-    for item in remapped_dict.items():
-        sorted_array = quick_sort(item[1])
-        sorted_res[item[0]] = "".join([str(digit) for digit in sorted_array])
-    return sorted_res
-
-
-def remap_s(str_dict):
-    m = 0
-    remapped = {key: "" for key in str_dict.keys()}  # key : node id, value: mapped string
-    already_seen = {}
-    for tpl in str_dict.items():
-        for char in tpl[1]:
-            if char in already_seen.keys():
-                mapping = already_seen[char]
-            else:
-                m = m + 1
-                already_seen[char] = m
-                mapping = m
-            remapped[tpl[0]] += str(mapping)
-    remapped = {item[0]: np.array([int(item[1][p]) for p in range(len(item[1]))]) for item in remapped.items()}
-    return remapped
+# POST-PROCESSING
+def merge_in_file():
+    files = sorted(os.listdir(DATA_PATH))
+    writer = open(MERGED_PATH, 'w', encoding='utf-8')
+    try:
+        for file in files:
+            full_dir = os.path.join(DATA_PATH, file)
+            try:
+                with open(full_dir, encoding='utf-8') as reader:
+                    class_entries = reader.readlines()
+            finally:
+                reader.close()
+            for entry in class_entries:
+                writer.write(entry)
+            writer.write('\n')
+    finally:
+        writer.close()
 
 
 def get_test_tree():
@@ -184,59 +174,3 @@ def new_test():
     test_tree.additional_nodes = {20, 21}
     test_tree.similar_lemmas = {10: [20, 21]}
     return test_tree
-
-
-def create_needed_directories():
-    if not os.path.exists(CLASSIFIED_DATA_PATH):
-        os.makedirs(CLASSIFIED_DATA_PATH)
-    if not os.path.exists(LONG_DATA_PATH):
-        os.makedirs(LONG_DATA_PATH)
-    if not os.path.exists(STABLE_DATA_PATH):
-        os.makedirs(STABLE_DATA_PATH)
-    if not os.path.exists(MANY_ROOTS_DATA_PATH):
-        os.makedirs(MANY_ROOTS_DATA_PATH)
-    if not os.path.exists(RESULT_PATH):
-        os.makedirs(RESULT_PATH)
-
-
-# PRE-PROCESSING
-# method splits input data in 3 datasets:
-# 1) stable (ready to run an algorithm),
-# 2) very long-read (sentences are too long and need to be split in 2 parts),
-# 3) many-rooted (case for compound sentences and incorrect parser's results (Ex: 5 roots in a sentence of length 10)
-# and copies files in corresponding directories
-# fix 2) and 3) manually and then run the main algorithm, which will walk through these directories and add all files.
-def sort_the_data():
-    files = os.listdir(DATA_PATH)
-    df_columns = ['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel']
-    for file in files:
-        full_dir = os.path.join(DATA_PATH, file)
-        with open(full_dir, encoding='utf-8') as f:
-            this_df = pd.read_csv(f, sep='\t', names=df_columns)
-            this_df = this_df[this_df.deprel != 'PUNC']
-        if this_df.groupby(this_df.deprel).get_group('ROOT').shape[0] > 1:
-            shutil.copy(full_dir, MANY_ROOTS_DATA_PATH)
-        elif this_df.shape[0] > 21:
-            name_split = file.split(DOT)
-            shutil.copy(os.path.join(ORIGINAL_DATA_PATH, DOT.join([name_split[0], name_split[1]])), LONG_DATA_PATH)
-        else:
-            shutil.copy(full_dir, STABLE_DATA_PATH)
-
-
-# POST-PROCESSING
-def merge_in_file():
-    files = sorted(os.listdir(DATA_PATH))
-    writer = open(MERGED_PATH, 'w', encoding='utf-8')
-    try:
-        for file in files:
-            full_dir = os.path.join(DATA_PATH, file)
-            try:
-                with open(full_dir, encoding='utf-8') as reader:
-                    class_entries = reader.readlines()
-            finally:
-                reader.close()
-            for entry in class_entries:
-                writer.write(entry)
-            writer.write('\n')
-    finally:
-        writer.close()
