@@ -4,7 +4,11 @@ import numpy as np
 
 # input: map_dict - {v.id: str value of mapped string}
 # returns: sorted_res - {v.id: str value of mapped string} in sorted order
+import pandas as pd
+
 from Tree import Tree, Node, Edge
+import shutil
+from Constants import *
 
 
 def radix_sort(map_dict):
@@ -182,11 +186,45 @@ def new_test():
     return test_tree
 
 
+def create_needed_directories():
+    if not os.path.exists(CLASSIFIED_DATA_PATH):
+        os.makedirs(CLASSIFIED_DATA_PATH)
+    if not os.path.exists(LONG_DATA_PATH):
+        os.makedirs(LONG_DATA_PATH)
+    if not os.path.exists(STABLE_DATA_PATH):
+        os.makedirs(STABLE_DATA_PATH)
+    if not os.path.exists(MANY_ROOTS_DATA_PATH):
+        os.makedirs(MANY_ROOTS_DATA_PATH)
+    if not os.path.exists(RESULT_PATH):
+        os.makedirs(RESULT_PATH)
+
+
+# PRE-PROCESSING
+# method splits input data in 3 datasets:
+# 1) stable (ready to run an algorithm),
+# 2) very long-read (sentences are too long and need to be split in 2 parts),
+# 3) many-rooted (case for compound sentences and incorrect parser's results (Ex: 5 roots in a sentence of length 10)
+# and copies files in corresponding directories
+# fix 2) and 3) manually and then run the main algorithm, which will walk through these directories and add all files.
+def sort_the_data():
+    files = os.listdir(DATA_PATH)
+    df_columns = ['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel']
+    for file in files:
+        full_dir = os.path.join(DATA_PATH, file)
+        with open(full_dir, encoding='utf-8') as f:
+            this_df = pd.read_csv(f, sep='\t', names=df_columns)
+        if this_df.groupby(this_df.deprel).get_group('ROOT').shape[0] > 1:
+            shutil.copy(full_dir, MANY_ROOTS_DATA_PATH)
+        elif this_df.shape[0] > 21:
+            shutil.copy(full_dir, LONG_DATA_PATH)
+        else:
+            shutil.copy(full_dir, STABLE_DATA_PATH)
+
+
+# POST-PROCESSING
 def merge_in_file():
-    DATA_PATH = r'medicalTextTrees/results_plain_no_word2vec'
-    PATH_MERGED = 'medicalTextTrees/merged_mess.txt'
     files = sorted(os.listdir(DATA_PATH))
-    writer = open(PATH_MERGED, 'w', encoding='utf-8')
+    writer = open(MERGED_PATH, 'w', encoding='utf-8')
     try:
         for file in files:
             full_dir = os.path.join(DATA_PATH, file)

@@ -10,13 +10,13 @@ import pandas as pd
 from gensim.models import Word2Vec, KeyedVectors
 
 from Tree import Tree, Node, Edge
+from Constants import *
+from Util import create_needed_directories, sort_the_data
 
-EMPTY_STR = ''
 pattern = re.compile('^#.+$')
 
 
 def read_data():
-    DATA_PATH = r'medicalTextTrees/parus_results'
     files = os.listdir(DATA_PATH)
     df_columns = ['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel']
     # trees_df = pd.DataFrame(columns=df_columns)
@@ -24,12 +24,14 @@ def read_data():
     stable_df = []
     many_roots_df = []
     very_long_df = []
+    count = 0
     for file in files:
         full_dir = os.path.join(DATA_PATH, file)
         name = file.split('.')[0]
         with open(full_dir, encoding='utf-8') as f:
             this_df = pd.read_csv(f, sep='\t', names=df_columns)
             if this_df['id'].duplicated().any():
+                count += 1
                 start_of_subtree_df = list(this_df.groupby(this_df.id).get_group(1).index)
                 boundaries = start_of_subtree_df + [max(list(this_df.index)) + 1]
                 list_of_dfs = [this_df.iloc[boundaries[n]:boundaries[n + 1]] for n in range(len(boundaries) - 1)]
@@ -119,7 +121,6 @@ def train_word2vec(trees_df_filtered, lemmas, dict_lemmas_3, part_of_speech_node
 
     model_2 = Word2Vec(min_count=1)
     model_2.build_vocab(sentences)
-    w2v_fpath = "additionalCorpus/all_norm-sz100-w10-cb0-it1-min100.w2v"
 
     # model.intersect_word2vec_format
     # similar_dict = {}
@@ -129,17 +130,15 @@ def train_word2vec(trees_df_filtered, lemmas, dict_lemmas_3, part_of_speech_node
 
     # additional_model =
     # w2v = Word2Vec.load_word2vec_format(w2v_fpath, binary=True, unicode_errors='ignore')
-    upper_bound = 50000
-    high_cosine_dist = 0.8
-    model = KeyedVectors.load_word2vec_format(w2v_fpath, binary=True, unicode_errors='ignore')
-    model_2.build_vocab([list(model.vocab.keys())[:upper_bound]], update=True)
-    model_2.intersect_word2vec_format(w2v_fpath, binary=True, lockf=1.0, unicode_errors='ignore')
-    model_2.train(sentences, total_examples=upper_bound, epochs=model_2.iter)
+    model = KeyedVectors.load_word2vec_format(ADDITIONAL_CORPUS_PATH, binary=True, unicode_errors='ignore')
+    model_2.build_vocab([list(model.vocab.keys())[:UPPER_BOUND_ADDITIONAL_DATA]], update=True)
+    model_2.intersect_word2vec_format(ADDITIONAL_CORPUS_PATH, binary=True, lockf=1.0, unicode_errors='ignore')
+    model_2.train(sentences, total_examples=UPPER_BOUND_ADDITIONAL_DATA, epochs=model_2.iter)
     similar_dict = {lemma: model_2.most_similar(lemma, topn=15) for lemma in lemmas if not pattern.match(lemma)}
     similar_lemmas_dict = {}
     for lemma, similar_lemmas in similar_dict.items():
         for similar_lemma, cosine_dist in similar_lemmas:
-            if cosine_dist > high_cosine_dist and similar_lemma in lemmas.keys() and part_of_speech_node_id[similar_lemma] == part_of_speech_node_id[lemma]:
+            if cosine_dist > HIGH_COSINE_DIST and similar_lemma in lemmas.keys() and part_of_speech_node_id[similar_lemma] == part_of_speech_node_id[lemma]:
                 if lemma not in similar_lemmas_dict.keys():
                     similar_lemmas_dict[lemma] = [similar_lemma]
                 else:
@@ -625,10 +624,8 @@ def compute_part_new_new(whole_tree, lemma_count, grouped_heights):
 
 
 def write_tree_in_table(whole_tree):
-    source_1 = 'medicalTextTrees/gephi_edges_import_word2vec.csv'
-    source_2 = 'medicalTextTrees/gephi_nodes_import_word2vec.csv'
-    with open(source_1, "w", newline='', encoding='utf-8') as csv_file_1, open(
-            source_2, "w", newline='', encoding='utf-8') as csv_file_2:
+    with open(EXCEL_EDGES_GEPHI_PATH, "w", newline='', encoding='utf-8') as csv_file_1, open(
+            EXCEL_NODES_GEPHI_PATH, "w", newline='', encoding='utf-8') as csv_file_2:
         writer_1 = csv.writer(csv_file_1, delimiter=',')
         writer_2 = csv.writer(csv_file_2, delimiter=',')
         writer_1.writerow(['Source', 'Target', 'Weight'])
@@ -640,6 +637,8 @@ def write_tree_in_table(whole_tree):
 
 
 def main():
+    create_needed_directories()
+    sort_the_data()
     start = time.time()
     trees_full_df, trees_df_filtered = read_data()
     test_3_sent = trees_df_filtered.head(12)
@@ -726,7 +725,7 @@ def main():
         for vertex in v:
             vertex_seq[vertex] = Tree.simple_dfs(whole_tree, vertex, classes_part_list[k])
         if len(vertex_seq.items()) > 0:
-            filename = 'medicalTextTrees/results_part_test_plain/results_%s.txt' % (str(k))
+            filename = RESULT_PATH + '/results_%s.txt' % (str(k))
             try:
                 with open(filename, 'w', encoding='utf-8') as filehandle:
                     for key, value in vertex_seq.items():
