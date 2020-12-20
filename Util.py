@@ -213,10 +213,12 @@ def sort_the_data():
         full_dir = os.path.join(DATA_PATH, file)
         with open(full_dir, encoding='utf-8') as f:
             this_df = pd.read_csv(f, sep='\t', names=df_columns)
+            this_df = this_df[this_df.deprel != 'PUNC']
         if this_df.groupby(this_df.deprel).get_group('ROOT').shape[0] > 1:
             shutil.copy(full_dir, MANY_ROOTS_DATA_PATH)
         elif this_df.shape[0] > 21:
-            shutil.copy(full_dir, LONG_DATA_PATH)
+            name_split = file.split(DOT)
+            shutil.copy(os.path.join(ORIGINAL_DATA_PATH, DOT.join([name_split[0], name_split[1]])), LONG_DATA_PATH)
         else:
             shutil.copy(full_dir, STABLE_DATA_PATH)
 
