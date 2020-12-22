@@ -50,7 +50,7 @@ def sort_the_data():
             this_df = this_df[this_df.deprel != 'PUNC']
         if this_df.groupby(this_df.deprel).get_group('ROOT').shape[0] > 1:
             shutil.copy(full_dir, MANY_ROOTS_DATA_PATH)
-        elif this_df.shape[0] > 21:
+        elif this_df.shape[0] > 23:
             name_split = file.split(DOT)
             shutil.copy(os.path.join(ORIGINAL_DATA_PATH, DOT.join([name_split[0], name_split[1]])), LONG_DATA_PATH)
         else:

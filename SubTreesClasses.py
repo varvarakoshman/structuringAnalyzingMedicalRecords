@@ -1,3 +1,4 @@
+import csv
 import os
 import pprint
 import re
@@ -16,7 +17,7 @@ pattern = re.compile('^#.+$')
 
 
 def read_data():
-    files = os.listdir(DATA_PATH)
+    files = os.listdir(r"temp/parus_results")
     df_columns = ['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel']
     # trees_df = pd.DataFrame(columns=df_columns)
     full_df = []
@@ -24,30 +25,35 @@ def read_data():
     many_roots_df = []
     very_long_df = []
     for file in files:
-        full_dir = os.path.join(DATA_PATH, file)
+        full_dir = os.path.join("temp/parus_results", file)
         name = file.split('.')[0]
         with open(full_dir, encoding='utf-8') as f:
             this_df = pd.read_csv(f, sep='\t', names=df_columns)
-            if this_df['id'].duplicated().any():
-                start_of_subtree_df = list(this_df.groupby(this_df.id).get_group(1).index)
-                boundaries = start_of_subtree_df + [max(list(this_df.index)) + 1]
-                list_of_dfs = [this_df.iloc[boundaries[n]:boundaries[n + 1]] for n in range(len(boundaries) - 1)]
-                local_counter = 1
-                for df in list_of_dfs:
-                    df['sent_name'] = name + '_' + str(local_counter)
-                    full_df.append(df)
-                    stable_df.append(df)
-                    local_counter += 1
-            else:
-                this_df['sent_name'] = name
-                if this_df.groupby(this_df.deprel).get_group('ROOT').shape[0] > 1:
-                    many_roots_df.append(this_df)
-                elif this_df.shape[0] > 21:
-                    very_long_df.append(this_df)
+            # this_df = this_df[this_df.deprel != 'PUNC']
+            if this_df.shape[0] > 0:
+                if this_df['id'].duplicated().any():
+                    start_of_subtree_df = list(this_df.groupby(this_df.id).get_group(1).index)
+                    boundaries = start_of_subtree_df + [max(list(this_df.index)) + 1]
+                    list_of_dfs = [this_df.iloc[boundaries[n]:boundaries[n + 1]] for n in range(len(boundaries) - 1)]
+                    local_counter = 1
+                    for df in list_of_dfs:
+                        df['sent_name'] = name + '_' + str(local_counter)
+                        full_df.append(df)
+                        stable_df.append(df)
+                        local_counter += 1
                 else:
-                    stable_df.append(this_df)
-                # trees_df = pd.concat([trees_df, this_df], ignore_index=True)
-                full_df.append(this_df)
+                    this_df['sent_name'] = name
+                    try:
+                        if this_df.groupby(this_df.deprel).get_group('ROOT').shape[0] > 1:
+                            many_roots_df.append(this_df)
+                        # elif this_df.shape[0] > 23:
+                        #     very_long_df.append(this_df)
+                        else:
+                            stable_df.append(this_df)
+                        # trees_df = pd.concat([trees_df, this_df], ignore_index=True)
+                        full_df.append(this_df)
+                    except KeyError as ke:
+                        dpf = []
     trees_df = pd.concat(stable_df, axis=0, ignore_index=True)
     # delete useless data
     # trees_df = trees_df.drop(columns=['upostag', 'xpostag', 'feats'], axis=1)
@@ -286,15 +292,15 @@ def get_strings_from_combinations(all_combinations, v_id, str_sequence_help, str
             combs = [str(item) for item in sorted(list(tup))]
             joined_label = EMPTY_STR.join(combs)
             if joined_label not in str_sequence_help.keys():
-                str_sequence_help[joined_label] = [str(item) for item in sorted(list(tup))]
+                str_sequence_help[joined_label] = combs.copy()
                 str_sequence_help_reversed[tuple(combs)] = joined_label
             all_combinations_str_joined.add(joined_label)
             if joined_label not in str_sequence_help.keys():
-                str_sequence_help[joined_label] = [[str(item) for item in sorted(list(tup))]]
+                str_sequence_help[joined_label] = [combs]
             else:
-                new_local_duplicates[v_id] = [str(item) for item in sorted(list(tup))]
-                str_sequence_help[joined_label].append([str(item) for item in sorted(list(tup))])
-            str_sequence_help_reversed[tuple([str(item) for item in sorted(list(tup))])] = joined_label
+                new_local_duplicates[v_id] = combs
+                str_sequence_help[joined_label].append(combs)
+            str_sequence_help_reversed[tuple(combs)] = joined_label
             all_combinations_str_joined.add(joined_label)
     return all_combinations_str_joined, new_local_duplicates
 
@@ -385,7 +391,6 @@ def insert_node_in_tree(whole_tree, existing_node, id_count, subtree_new_label, 
                         lemma_nodeid_dict, old_node_new_nodes, edge_to_curr, node_id):
     # add a new node with a new lemma
     new_node = Tree.copy_node_details(existing_node, id_count)
-    id_count += 1
     new_node.lemma = subtree_new_label
     Tree.add_node_to_dict(whole_tree, new_node)
     whole_tree.global_similar_mapping[new_node.id] = new_node.id
@@ -503,11 +508,11 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
                             new_node = insert_node_in_tree(whole_tree, existing_node, id_count, subtree_new_label,
                                                            subtree_label_sent,
                                                            lemma_nodeid_dict, old_node_new_nodes, edge_to_curr, node_id)
-
+                            id_count += 1
                             subtree_children = find_subtree_children(whole_tree, children, subtree, lemma_nodeid_dict,
                                                                      equal_nodes_mapping)
                             if len(subtree_children) > 0:
-                                general_comb = ''.join(sorted(
+                                general_comb = EMPTY_STR.join(sorted(
                                     [str(whole_tree.global_similar_mapping[child_id]) for child_id in
                                      subtree_children]))
                                 if general_comb not in saved_combinations:
@@ -536,8 +541,8 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
 
 
 def main():
-    create_needed_directories()
-    sort_the_data()
+    # create_needed_directories()
+    # sort_the_data()
     start = time.time()
     trees_full_df, trees_df_filtered = read_data()
     test_3_sent = trees_df_filtered.head(12)
