@@ -11,13 +11,13 @@ from gensim.models import Word2Vec, KeyedVectors
 
 from Tree import Tree, Node, Edge
 from Constants import *
-from Util import create_needed_directories, sort_the_data
+from Util import create_needed_directories, sort_the_data, replace_time_constructions, pick_new_sentences, merge_in_file
 
 pattern = re.compile('^#.+$')
 
 
 def read_data():
-    files = os.listdir(r"temp/parus_results")
+    files = os.listdir(DATA_PATH)
     df_columns = ['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel']
     # trees_df = pd.DataFrame(columns=df_columns)
     full_df = []
@@ -25,35 +25,32 @@ def read_data():
     many_roots_df = []
     very_long_df = []
     for file in files:
-        full_dir = os.path.join("temp/parus_results", file)
+        full_dir = os.path.join(DATA_PATH, file)
         name = file.split('.')[0]
         with open(full_dir, encoding='utf-8') as f:
             this_df = pd.read_csv(f, sep='\t', names=df_columns)
             # this_df = this_df[this_df.deprel != 'PUNC']
-            if this_df.shape[0] > 0:
-                if this_df['id'].duplicated().any():
-                    start_of_subtree_df = list(this_df.groupby(this_df.id).get_group(1).index)
-                    boundaries = start_of_subtree_df + [max(list(this_df.index)) + 1]
-                    list_of_dfs = [this_df.iloc[boundaries[n]:boundaries[n + 1]] for n in range(len(boundaries) - 1)]
-                    local_counter = 1
-                    for df in list_of_dfs:
-                        df['sent_name'] = name + '_' + str(local_counter)
-                        full_df.append(df)
-                        stable_df.append(df)
-                        local_counter += 1
+            if this_df['id'].duplicated().any():
+                start_of_subtree_df = list(this_df.groupby(this_df.id).get_group(1).index)
+                boundaries = start_of_subtree_df + [max(list(this_df.index)) + 1]
+                list_of_dfs = [this_df.iloc[boundaries[n]:boundaries[n + 1]] for n in range(len(boundaries) - 1)]
+                local_counter = 1
+                for df in list_of_dfs:
+                    df['sent_name'] = name + '_' + str(local_counter)
+                    full_df.append(df)
+                    stable_df.append(df)
+                    local_counter += 1
+            else:
+                this_df['sent_name'] = name
+                if this_df.groupby(this_df.deprel).get_group('ROOT').shape[0] > 1:
+                    many_roots_df.append(this_df)
+                elif this_df.shape[0] > 23:
+                    very_long_df.append(this_df)
                 else:
-                    this_df['sent_name'] = name
-                    try:
-                        if this_df.groupby(this_df.deprel).get_group('ROOT').shape[0] > 1:
-                            many_roots_df.append(this_df)
-                        # elif this_df.shape[0] > 23:
-                        #     very_long_df.append(this_df)
-                        else:
-                            stable_df.append(this_df)
-                        # trees_df = pd.concat([trees_df, this_df], ignore_index=True)
-                        full_df.append(this_df)
-                    except KeyError as ke:
-                        dpf = []
+                    stable_df.append(this_df)
+                    # trees_df = pd.concat([trees_df, this_df], ignore_index=True)
+                full_df.append(this_df)
+
     trees_df = pd.concat(stable_df, axis=0, ignore_index=True)
     # delete useless data
     # trees_df = trees_df.drop(columns=['upostag', 'xpostag', 'feats'], axis=1)
@@ -70,14 +67,14 @@ def read_data():
     # trees_df_filtered.loc[12239, 'deprel'] = '1-компл'
     # trees_df_filtered.loc[12239, 'head'] = 2
 
-    trees_long_df = pd.concat(very_long_df, axis=0, ignore_index=True)
-    trees_roots_df = pd.concat(many_roots_df, axis=0, ignore_index=True)
-    trees_long_df = trees_long_df[trees_long_df.deprel != 'PUNC']
-    trees_roots_df = trees_roots_df[trees_roots_df.deprel != 'PUNC']
-    trees_long_df = trees_long_df.reset_index(drop=True)
-    trees_long_df.index = trees_long_df.index + 1
-    trees_roots_df = trees_roots_df.reset_index(drop=True)
-    trees_roots_df.index = trees_roots_df.index + 1
+    # trees_long_df = pd.concat(very_long_df, axis=0, ignore_index=True)
+    # trees_roots_df = pd.concat(many_roots_df, axis=0, ignore_index=True)
+    # trees_long_df = trees_long_df[trees_long_df.deprel != 'PUNC']
+    # trees_roots_df = trees_roots_df[trees_roots_df.deprel != 'PUNC']
+    # trees_long_df = trees_long_df.reset_index(drop=True)
+    # trees_long_df.index = trees_long_df.index + 1
+    # trees_roots_df = trees_roots_df.reset_index(drop=True)
+    # trees_roots_df.index = trees_roots_df.index + 1
 
     trees_full_df = pd.concat(full_df, axis=0, ignore_index=True)
     trees_full_df = trees_full_df.reset_index(drop=True)
@@ -343,9 +340,11 @@ def collect_equal_nodes(whole_tree, v_id, old_node_new_nodes, equal_nodes_mappin
             actual_label = w + str(child_node.lemma)
             merge = []
             if child in old_node_new_nodes.keys():
-                merge = extend_equal_nodes_mapping(w, old_node_new_nodes[child], function_identity, equal_nodes_mapping, actual_label)
+                merge = extend_equal_nodes_mapping(w, old_node_new_nodes[child], function_identity, equal_nodes_mapping,
+                                                   actual_label)
             if child in whole_tree.similar_lemmas.keys():
-                merge = extend_equal_nodes_mapping(w, whole_tree.similar_lemmas[child], function_lemma_getter, equal_nodes_mapping, actual_label)
+                merge = extend_equal_nodes_mapping(w, whole_tree.similar_lemmas[child], function_lemma_getter,
+                                                   equal_nodes_mapping, actual_label)
                 merge.insert(0, actual_label)
             if actual_label not in equal_nodes.keys():
                 equal_nodes[actual_label] = merge
@@ -543,8 +542,10 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
 def main():
     # create_needed_directories()
     # sort_the_data()
+    # pick_new_sentences()
     start = time.time()
     trees_full_df, trees_df_filtered = read_data()
+    replace_time_constructions(trees_df_filtered)
     test_3_sent = trees_df_filtered.head(12)
     print('Time on reading the data: ' + str(time.time() - start))
     part_of_speech_node_id = dict(trees_full_df[['lemma', 'upostag']].groupby(['lemma', 'upostag']).groups.keys())
@@ -556,13 +557,13 @@ def main():
     dict_lemmas_rev = {index[0]: lemma for lemma, index in dict_lemmas_full.items()}
     dict_lemmas_3 = {lemma: [index] for index, lemma in enumerate(dict.fromkeys(test_3_sent['lemma'].to_list()), 1)}
     #
-    numbers = [item for item in list(dict_lemmas_full.keys()) if pattern.match(item)]
-    numbers_one_lemma = dict_lemmas_full[numbers[0]]
-    for num in numbers:
-        dict_lemmas[num] = numbers_one_lemma
-        dict_lemmas_full[num] = numbers_one_lemma
-        if num in dict_lemmas_3.keys():
-            dict_lemmas_3[num] = numbers_one_lemma
+    # numbers = [item for item in list(dict_lemmas_full.keys()) if pattern.match(item)]
+    # numbers_one_lemma = dict_lemmas_full[numbers[0]]
+    # for num in numbers:
+    #     dict_lemmas[num] = numbers_one_lemma
+    #     dict_lemmas_full[num] = numbers_one_lemma
+    #     if num in dict_lemmas_3.keys():
+    #         dict_lemmas_3[num] = numbers_one_lemma
     # get all relations and create a dictionary to map to numbers
     # dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_full_df['deprel'].to_list()))}
     dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
@@ -606,10 +607,15 @@ def main():
             filename = RESULT_PATH + '/results_%s.txt' % (str(k))
             try:
                 with open(filename, 'w', encoding='utf-8') as filehandle:
-                    for key, value in vertex_seq.items():
+                    target_indices = {v[0][3]: k for k, v in vertex_seq.items()}.values()
+                    vertex_seq_filtered = {k: v for k, v in vertex_seq.items() if k in target_indices}
+                    for key, value in vertex_seq_filtered.items():
                         filehandle.write("%s: %s\n" % (key, value))
             finally:
                 filehandle.close()
+
+    merge_in_file()
+    # {k: v for k, v in sorted(classes_part.items(), key=lambda item: len(item[1]), reverse=True)}
 
     # TEST
     # test_tree = Util.get_test_tree()

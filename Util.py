@@ -1,11 +1,21 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# vim:fileencoding=utf-8
+
+import csv
 import os
+import re
 import shutil
 
+import numpy as np
 import pandas as pd
 
 from Constants import *
 from Tree import Tree, Node, Edge
-import csv
+
+pattern_year = re.compile('^[0-9]{4}$')
+pattern_full_date = re.compile('^([0-9]+\.){2}[0-9]+$')
+pattern_part_date = re.compile('^[0-9]+\.[0-9][1-9]+$')
 
 
 def create_needed_directories():
@@ -33,6 +43,7 @@ def write_tree_in_table(whole_tree):
         for node in whole_tree.nodes:
             writer_2.writerow([node.id, (node.lemma, node.form, node.sent_name)])
 
+
 # PRE-PROCESSING
 # method splits input data in 3 datasets:
 # 1) stable (ready to run an algorithm),
@@ -59,11 +70,11 @@ def sort_the_data():
 
 # POST-PROCESSING
 def merge_in_file():
-    files = sorted(os.listdir(DATA_PATH))
+    files = sorted(os.listdir(RESULT_PATH))
     writer = open(MERGED_PATH, 'w', encoding='utf-8')
     try:
         for file in files:
-            full_dir = os.path.join(DATA_PATH, file)
+            full_dir = os.path.join(RESULT_PATH, file)
             try:
                 with open(full_dir, encoding='utf-8') as reader:
                     class_entries = reader.readlines()
@@ -74,6 +85,33 @@ def merge_in_file():
             writer.write('\n')
     finally:
         writer.close()
+
+
+def replace_time_constructions(df):
+    months = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь',
+              'декабрь']
+    day_times = ['утро', 'день', 'вечер', 'ночь']
+    seasons = ['лето', 'осень', 'зима', 'весна']
+    for month in months:
+        df.loc[df['lemma'] == month, 'lemma'] = '#месяц'
+    for day_time in day_times:
+        df.loc[df['lemma'] == day_time, 'lemma'] = '#времясуток'
+    for season in seasons:
+        df.loc[df['lemma'] == season, 'lemma'] = '#сезон'
+    df['lemma'] = df['lemma'].apply(func)
+
+
+def func(lemma):
+    if not pd.isnull(lemma):
+        if pattern_year.match(lemma):
+            return '#год'
+        elif pattern_full_date.match(lemma):
+            return '#пдата'
+        elif pattern_part_date.match(lemma):
+            return '#чдата'
+        elif lemma == '@card@':
+            return '#число'
+    return lemma
 
 
 def get_test_tree():
@@ -114,6 +152,30 @@ def get_test_tree():
     Tree.add_edge(test_tree, Edge(2, 5, 20))
     Tree.add_edge(test_tree, Edge(12, 15, 20))
     return test_tree
+
+
+# compare new sentences with existent, pick ones that don't duplicate
+def pick_new_sentences():
+    existing_sent = []
+    existing_len = []
+    files = os.listdir(DATA_PATH)
+    df_columns = ['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel']
+    for file in files:
+        full_dir = os.path.join(DATA_PATH, file)
+        with open(full_dir, encoding='utf-8') as f:
+            this_df = pd.read_csv(f, sep='\t', names=df_columns)
+            sent_str = EMPTY_STR.join(list(this_df.form))
+            existing_sent.append(sent_str)
+            existing_len.append(len(sent_str))
+    files_new = os.listdir(r"parus_results_tags_additional")
+    for file in files_new:
+        full_dir = os.path.join(r"parus_results_tags_additional", file)
+        with open(full_dir, encoding='utf-8') as f:
+            this_df = pd.read_csv(f, sep='\t', names=df_columns)
+            sent_str = EMPTY_STR.join(list(this_df.form))
+            if len(sent_str) not in existing_len:
+                if sent_str not in existing_sent:
+                    shutil.copy(full_dir, "brand_new_sentences")
 
 
 def new_test():
