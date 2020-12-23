@@ -1,5 +1,5 @@
 # Path constants
-DATA_PATH = r"medicalTextTrees/parus_results_copy"
+DATA_PATH = r"data/main"
 ORIGINAL_DATA_PATH = "original_sentences_separeted"
 RESULT_PATH = "medicalTextTrees/results_part_test_plain"
 ADDITIONAL_CORPUS_PATH = "additionalCorpus/all_norm-sz100-w10-cb0-it1-min100.w2v"

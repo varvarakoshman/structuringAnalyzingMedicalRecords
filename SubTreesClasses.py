@@ -44,7 +44,7 @@ def read_data():
                 this_df['sent_name'] = name
                 if this_df.groupby(this_df.deprel).get_group('ROOT').shape[0] > 1:
                     many_roots_df.append(this_df)
-                elif this_df.shape[0] > 23:
+                elif this_df.shape[0] > 22:
                     very_long_df.append(this_df)
                 else:
                     stable_df.append(this_df)
