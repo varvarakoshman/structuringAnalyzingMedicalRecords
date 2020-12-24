@@ -11,7 +11,8 @@ from gensim.models import Word2Vec, KeyedVectors
 
 from Tree import Tree, Node, Edge
 from Constants import *
-from Util import create_needed_directories, sort_the_data, replace_time_constructions, pick_new_sentences, merge_in_file
+from Util import create_needed_directories, sort_the_data, replace_time_constructions, pick_new_sentences, \
+    merge_in_file, write_tree_in_table
 
 pattern = re.compile('^#.+$')
 
@@ -22,7 +23,6 @@ def read_data():
     # trees_df = pd.DataFrame(columns=df_columns)
     full_df = []
     stable_df = []
-    many_roots_df = []
     very_long_df = []
     for file in files:
         full_dir = os.path.join(DATA_PATH, file)
@@ -42,9 +42,10 @@ def read_data():
                     local_counter += 1
             else:
                 this_df['sent_name'] = name
-                if this_df.groupby(this_df.deprel).get_group('ROOT').shape[0] > 1:
-                    many_roots_df.append(this_df)
-                elif this_df.shape[0] > 22:
+                # if this_df.groupby(this_df.deprel).get_group('ROOT').shape[0] > 1:
+                #    many_roots_df.append(this_df)
+                # stable_df.append(this_df)
+                if this_df.shape[0] > 23:
                     very_long_df.append(this_df)
                 else:
                     stable_df.append(this_df)
@@ -88,11 +89,12 @@ def read_data():
         trees_df_filtered.loc[num, 'upostag'] = 'Num'
         trees_full_df.loc[num, 'upostag'] = 'Num'
 
-    # target_sents = list({'55338_41', '58401_7', '32384_8', '31736_14', '48714_8', '54996_6'}) # TEST
+    # target_sents = list({'44112_8', '38674_5', '55654_2', '35628_5', '32867_6', '57809_7', '57126_7'})  # TEST
+    # target_sents = list({'32867_6', '57809_7', '57126_7'})  # TEST
     # target_sents = list({'55338_41', '58401_7'})  # TEST
     # target_sents = list({'32191_2', '58282_3', '55066_0', '46855_3', '48408_0', '37676_3',
     #                      '32191_0', '56109_5', '56661_0', '54743_1'})
-    # trees_df_filtered = trees_df_filtered.loc[trees_df_filtered.sent_name.isin(target_sents)] # TEST
+    # trees_df_filtered = trees_df_filtered.loc[trees_df_filtered.sent_name.isin(target_sents)]  # TEST
 
     # trees_full_df.loc[trees_full_df.index.isin(replaced_numbers)].assign(upostag = 'N')
     # trees_full_df = trees_full_df.head(6020)
@@ -438,6 +440,8 @@ def add_new_subtree_label(unique_subtrees_mapped_global_subtree_lemma, lemma, le
     str_tree_label = str(lemma) + tree_label
     if str_tree_label not in unique_subtrees_mapped_global_subtree_lemma.keys():
         unique_subtrees_mapped_global_subtree_lemma[str_tree_label] = lemma_count
+        lemma_count += 1
+    return lemma_count
 
 
 def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
@@ -486,13 +490,13 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
                             combination_ids[label] = [v_id]
                     for id, comb_list in new_local_duplicates.items():
                         duplicate_combs[id] = comb_list
-                        add_new_subtree_label(unique_subtrees_mapped_global_subtree_lemma, lemma, lemma_count,
-                                              EMPTY_STR.join(comb_list))
-                        lemma_count += 1
+                        lemma_count = add_new_subtree_label(unique_subtrees_mapped_global_subtree_lemma, lemma,
+                                                            lemma_count,
+                                                            EMPTY_STR.join(comb_list))
                 filtered_combination_ids = {k: v for k, v in combination_ids.items() if len(v) > 1}
                 for tree_label, node_list in filtered_combination_ids.items():
-                    add_new_subtree_label(unique_subtrees_mapped_global_subtree_lemma, lemma, lemma_count, tree_label)
-                    lemma_count += 1
+                    lemma_count = add_new_subtree_label(unique_subtrees_mapped_global_subtree_lemma, lemma, lemma_count,
+                                                        tree_label)
                 dict_nodeid_comb = get_nodeid_repeats(filtered_combination_ids, str_sequence_help, duplicate_combs)
                 for node_id, node_subtrees in dict_nodeid_comb.items():
                     existing_node = Tree.get_node(whole_tree, node_id)
@@ -525,14 +529,16 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
                                     subtree_deep_children = find_deep_subtree_children(whole_tree, subtree_children,
                                                                                        classes_subtreeid_nodes_list)
                                     only_active = subtree_deep_children - whole_tree.inactive
+                                    if len(only_active) == 0:
+                                        only_active.update(subtree_children)
                                     if subtree_new_label not in classes_subtreeid_nodes_list.keys():
                                         classes_subtreeid_nodes_list[subtree_new_label] = only_active
                                     else:
                                         classes_subtreeid_nodes_list[subtree_new_label].update(only_active)
                                     classes_subtreeid_nodes_list[subtree_new_label].add(new_node.id)
                                     saved_combinations.append(general_comb)
-                    # remove old node and edges to/from it
-                    Tree.add_inactive(whole_tree, node_id)
+                            # remove old node and edges to/from it
+                            Tree.add_inactive(whole_tree, node_id)
         print(time.time() - start)
     classes_subtreeid_nodes = {k: v for k, v in classes_subtreeid_nodes.items() if
                                len(v) > 1}  # TODO: why do len=1 entries even appear here??
@@ -540,13 +546,14 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
 
 
 def main():
+    merge_in_file()
     # create_needed_directories()
     # sort_the_data()
     # pick_new_sentences()
     start = time.time()
     trees_full_df, trees_df_filtered = read_data()
     replace_time_constructions(trees_df_filtered)
-    test_3_sent = trees_df_filtered.head(12)
+    replace_time_constructions(trees_full_df)
     print('Time on reading the data: ' + str(time.time() - start))
     part_of_speech_node_id = dict(trees_full_df[['lemma', 'upostag']].groupby(['lemma', 'upostag']).groups.keys())
 
@@ -555,30 +562,16 @@ def main():
     dict_lemmas_full = {lemma: [index] for index, lemma in
                         enumerate(dict.fromkeys(trees_full_df['lemma'].to_list()), 1)}
     dict_lemmas_rev = {index[0]: lemma for lemma, index in dict_lemmas_full.items()}
-    dict_lemmas_3 = {lemma: [index] for index, lemma in enumerate(dict.fromkeys(test_3_sent['lemma'].to_list()), 1)}
-    #
-    # numbers = [item for item in list(dict_lemmas_full.keys()) if pattern.match(item)]
-    # numbers_one_lemma = dict_lemmas_full[numbers[0]]
-    # for num in numbers:
-    #     dict_lemmas[num] = numbers_one_lemma
-    #     dict_lemmas_full[num] = numbers_one_lemma
-    #     if num in dict_lemmas_3.keys():
-    #         dict_lemmas_3[num] = numbers_one_lemma
-    # get all relations and create a dictionary to map to numbers
-    # dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_full_df['deprel'].to_list()))}
     dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
     start = time.time()
     train_word2vec(trees_full_df, dict_lemmas_full, dict_lemmas, part_of_speech_node_id)
     print('Time on word2vec: ' + str(time.time() - start))
 
     start = time.time()
-    # test_dict_lemmas = get_test_dict_lemmas()
-    # new_test_dict = {k: test_dict_lemmas[i] for i, k in enumerate(dict_lemmas_3.keys())}
     whole_tree = construct_tree(trees_df_filtered, dict_lemmas, dict_rel, dict_lemmas_rev)
     # write_tree_in_table(whole_tree)
-
     print('Time on constructing the tree: ' + str(time.time() - start))
-    # whole_tree = new_test()
+
     Tree.set_help_dict(whole_tree)
     # partition nodes by height
     start = time.time()
@@ -603,19 +596,21 @@ def main():
         vertex_seq = {}
         for vertex in v:
             vertex_seq[vertex] = Tree.simple_dfs(whole_tree, vertex, classes_part_list[k])
-        if len(vertex_seq.items()) > 0:
+        if len(vertex_seq.items()) > 0 and len(vertex_seq[list(vertex_seq)[0]]) > 1:
             filename = RESULT_PATH + '/results_%s.txt' % (str(k))
             try:
                 with open(filename, 'w', encoding='utf-8') as filehandle:
                     target_indices = {v[0][3]: k for k, v in vertex_seq.items()}.values()
                     vertex_seq_filtered = {k: v for k, v in vertex_seq.items() if k in target_indices}
-                    for key, value in vertex_seq_filtered.items():
-                        filehandle.write("%s: %s\n" % (key, value))
+                    # better print for testing
+                    # for key, value in vertex_seq_filtered.items():
+                    #     filehandle.write("%s: %s\n" % (key, value))
+                    for _, value in vertex_seq_filtered.items():
+                        filehandle.write("%s: %s\n" % (value[0][3], SPACE.join(list(map(lambda list_entry: list_entry[2], value)))))
             finally:
                 filehandle.close()
 
     merge_in_file()
-    # {k: v for k, v in sorted(classes_part.items(), key=lambda item: len(item[1]), reverse=True)}
 
     # TEST
     # test_tree = Util.get_test_tree()
