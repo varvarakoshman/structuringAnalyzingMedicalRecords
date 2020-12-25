@@ -151,19 +151,19 @@ class Tree:
         node = self.get_node(vertex)
         if node is not None:
             sequence.append(tuple([vertex, node.lemma, node.form, node.sent_name]))
-            visited = {node.id: False for node in self.nodes}
+            visited = []
             stack = [vertex]
             while len(stack) > 0:
                 curr = stack[-1]
-                if not visited[curr]:
-                    visited[curr] = True
+                if curr not in visited:
+                    visited.append(curr)
                 children = self.get_children(curr)
                 if len(children) == 0:
                     stack.pop()
                 else:
                     all_visited_flag = True
                     for child in children:
-                        if child in subtree_vertices and not visited[child]:
+                        if child in subtree_vertices and curr not in visited:
                             all_visited_flag = False
                             stack.append(child)
                             node = self.get_node(child)

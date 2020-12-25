@@ -20,16 +20,13 @@ pattern = re.compile('^#.+$')
 def read_data():
     files = os.listdir(DATA_PATH)
     df_columns = ['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel']
-    # trees_df = pd.DataFrame(columns=df_columns)
     full_df = []
     stable_df = []
-    very_long_df = []
     for file in files:
         full_dir = os.path.join(DATA_PATH, file)
         name = file.split('.')[0]
         with open(full_dir, encoding='utf-8') as f:
             this_df = pd.read_csv(f, sep='\t', names=df_columns)
-            # this_df = this_df[this_df.deprel != 'PUNC']
             if this_df['id'].duplicated().any():
                 start_of_subtree_df = list(this_df.groupby(this_df.id).get_group(1).index)
                 boundaries = start_of_subtree_df + [max(list(this_df.index)) + 1]
@@ -42,40 +39,23 @@ def read_data():
                     local_counter += 1
             else:
                 this_df['sent_name'] = name
-                # if this_df.groupby(this_df.deprel).get_group('ROOT').shape[0] > 1:
-                #    many_roots_df.append(this_df)
-                # stable_df.append(this_df)
-                if this_df.shape[0] > 23:
-                    very_long_df.append(this_df)
-                else:
-                    stable_df.append(this_df)
-                    # trees_df = pd.concat([trees_df, this_df], ignore_index=True)
+                stable_df.append(this_df)           # for strong equality
+                # if this_df.shape[0] < 24:         # for word2vec
+                #     stable_df.append(this_df)
                 full_df.append(this_df)
 
     trees_df = pd.concat(stable_df, axis=0, ignore_index=True)
     # delete useless data
-    # trees_df = trees_df.drop(columns=['upostag', 'xpostag', 'feats'], axis=1)
     trees_df = trees_df.drop(columns=['xpostag', 'feats'], axis=1)
     # trees_df.drop(index=[11067], inplace=True)
     trees_df.loc[13742, 'deprel'] = 'разъяснит'
 
     # delete relations of type PUNC and reindex
     trees_df_filtered = trees_df[trees_df.deprel != 'PUNC']
-    # trees_df_filtered = trees_df_filtered.loc[trees_df_filtered['sent_name'] != '37918_12']
-    # trees_df_filtered = trees_df_filtered.loc[trees_df_filtered['sent_name'] != '38897_9'] # 1) very long sentence 2) 5 roots
     trees_df_filtered = trees_df_filtered.reset_index(drop=True)
     trees_df_filtered.index = trees_df_filtered.index + 1
     # trees_df_filtered.loc[12239, 'deprel'] = '1-компл'
     # trees_df_filtered.loc[12239, 'head'] = 2
-
-    # trees_long_df = pd.concat(very_long_df, axis=0, ignore_index=True)
-    # trees_roots_df = pd.concat(many_roots_df, axis=0, ignore_index=True)
-    # trees_long_df = trees_long_df[trees_long_df.deprel != 'PUNC']
-    # trees_roots_df = trees_roots_df[trees_roots_df.deprel != 'PUNC']
-    # trees_long_df = trees_long_df.reset_index(drop=True)
-    # trees_long_df.index = trees_long_df.index + 1
-    # trees_roots_df = trees_roots_df.reset_index(drop=True)
-    # trees_roots_df.index = trees_roots_df.index + 1
 
     trees_full_df = pd.concat(full_df, axis=0, ignore_index=True)
     trees_full_df = trees_full_df.reset_index(drop=True)
@@ -84,7 +64,7 @@ def read_data():
     trees_full_df = trees_full_df[trees_full_df.deprel != 'PUNC']
 
     replaced_numbers = [k for k, v in trees_full_df.lemma.str.contains('#').to_dict().items() if
-                        v == True]  # едленно, вставить выше
+                        v == True]
     for num in replaced_numbers:
         trees_df_filtered.loc[num, 'upostag'] = 'Num'
         trees_full_df.loc[num, 'upostag'] = 'Num'
@@ -93,11 +73,10 @@ def read_data():
     # target_sents = list({'32867_6', '57809_7', '57126_7'})  # TEST
     # target_sents = list({'55338_41', '58401_7'})  # TEST
     # target_sents = list({'32191_2', '58282_3', '55066_0', '46855_3', '48408_0', '37676_3',
-    #                      '32191_0', '56109_5', '56661_0', '54743_1'})
+    #                      '32191_0', '56109_5', '56661_0', '54743_1'}) # TEST
     # trees_df_filtered = trees_df_filtered.loc[trees_df_filtered.sent_name.isin(target_sents)]  # TEST
-
     # trees_full_df.loc[trees_full_df.index.isin(replaced_numbers)].assign(upostag = 'N')
-    # trees_full_df = trees_full_df.head(6020)
+
     return trees_full_df, trees_df_filtered
 
 
@@ -150,7 +129,7 @@ def construct_tree(trees_df_filtered, dict_lemmas, dict_rel, dict_lemmas_rev):
     # construct a tree with a list of edges and a list of nodes
     whole_tree = Tree()
     root_node = Node(0, 0)  # add root
-    Tree.add_node(whole_tree, root_node)
+    whole_tree.add_node(root_node)
     new_id_count = len(trees_df_filtered) + 1
     similar_lemmas_dict = {}
     global_similar_mapping = {}
@@ -170,14 +149,14 @@ def construct_tree(trees_df_filtered, dict_lemmas, dict_rel, dict_lemmas_rev):
             sent = row['sent_name']
             form = row['form']
             # create main node
-            Tree.create_new_node(whole_tree, main_id, curr_lemmas[0], form, sent, weight, from_id)
+            whole_tree.create_new_node(main_id, curr_lemmas[0], form, sent, weight, from_id)
             children = [main_id]
             edge_to_weight[main_id] = weight
             global_similar_mapping[main_id] = main_id
             # if lemma has additional values add additional nodes
             if len(curr_lemmas) > 1:
                 for i in range(1, len(curr_lemmas)):
-                    Tree.create_new_node(whole_tree, new_id_count, curr_lemmas[i], form, sent, weight, from_id)
+                    whole_tree.create_new_node(new_id_count, curr_lemmas[i], form, sent, weight, from_id)
                     edge_to_weight[new_id_count] = weight
                     if main_id not in similar_lemmas_dict.keys():
                         similar_lemmas_dict[main_id] = [new_id_count]
@@ -196,7 +175,7 @@ def construct_tree(trees_df_filtered, dict_lemmas, dict_rel, dict_lemmas_rev):
                 similar_ids = similar_lemmas_dict[from_id]
                 for similar_id in similar_ids:
                     for child_id in children:
-                        Tree.add_edge(whole_tree, Edge(similar_id, child_id, edge_to_weight[child_id]))
+                        whole_tree.add_edge(Edge(similar_id, child_id, edge_to_weight[child_id]))
     whole_tree.additional_nodes = set([sublist for list in similar_lemmas_dict.values() for sublist in list])
     whole_tree.similar_lemmas = similar_lemmas_dict
     whole_tree.global_similar_mapping = global_similar_mapping
@@ -207,8 +186,8 @@ def add_children_to_parents(k_2, filtered_groups, whole_tree, curr_height, old_n
     all_parents = set()
     for k, v in filtered_groups.items():
         for v_id in list(v):
-            edge_to_curr = Tree.get_edge(whole_tree, v_id)
-            Tree.get_node(whole_tree, v_id).is_included = True
+            edge_to_curr = whole_tree.get_edge(v_id)
+            whole_tree.get_node(v_id).is_included = True
             if edge_to_curr is not None:
                 parent = edge_to_curr[0].node_from
                 if parent not in whole_tree.heights.keys():  # same as in whole_tree.additional
@@ -221,7 +200,7 @@ def add_children_to_parents(k_2, filtered_groups, whole_tree, curr_height, old_n
                     lemmas_to_visit = [k]
                 if v_id in whole_tree.similar_lemmas.keys():
                     for node_id in whole_tree.similar_lemmas[v_id]:
-                        lemmas_to_visit.append(Tree.get_node(whole_tree, node_id).lemma)
+                        lemmas_to_visit.append(whole_tree.get_node(node_id).lemma)
                 for lemma in lemmas_to_visit:
                     label_for_child = str(edge_to_curr[0].weight) + str(lemma)
                     if parent not in k_2.keys():
@@ -234,9 +213,9 @@ def add_children_to_parents(k_2, filtered_groups, whole_tree, curr_height, old_n
 def add_additional_children_to_parents(k_2, whole_tree, all_parents):
     additional_child_nodes = {}
     for parent in all_parents:
-        for child_id in Tree.get_children(whole_tree, parent):
-            edge_to_curr = Tree.get_edge(whole_tree, child_id)[0]
-            child_node = Tree.get_node(whole_tree, child_id)
+        for child_id in whole_tree.get_children(parent):
+            edge_to_curr = whole_tree.get_edge(child_id)[0]
+            child_node = whole_tree.get_node(child_id)
             if not child_node.is_included:
                 label_for_child = str(edge_to_curr.weight) + str(child_node.lemma)
                 k_2[parent].add(label_for_child)
@@ -330,14 +309,14 @@ def extend_equal_nodes_mapping(w, item_list, function, equal_nodes_mapping, actu
 
 def collect_equal_nodes(whole_tree, v_id, old_node_new_nodes, equal_nodes_mapping):
     equal_nodes = {}
-    function_lemma_getter = lambda node_id: str(Tree.get_node(whole_tree, node_id).lemma)
+    function_lemma_getter = lambda node_id: str(whole_tree.get_node(node_id).lemma)
     function_identity = lambda lemma: str(lemma)
     # only for duplicating nodes
-    children = Tree.get_children(whole_tree, v_id) - whole_tree.created - whole_tree.additional_nodes
+    children = whole_tree.get_children(v_id) - whole_tree.created - whole_tree.additional_nodes
     for child in children:
         if child in old_node_new_nodes.keys() or child in whole_tree.similar_lemmas.keys():
-            edge_to_child = Tree.get_edge(whole_tree, child)[0]
-            child_node = Tree.get_node(whole_tree, child)
+            edge_to_child = whole_tree.get_edge(child)[0]
+            child_node = whole_tree.get_node(child)
             w = str(edge_to_child.weight)
             actual_label = w + str(child_node.lemma)
             merge = []
@@ -365,13 +344,13 @@ def find_subtree_children(whole_tree, children, subtree, lemma_nodeid_dict, equa
                 if len(target_child_list) > 0:
                     target_child = target_child_list[0]
                 else:
-                    target_child = Tree.get_target_from_children(whole_tree, children_nodes, children, subtree_node)
+                    target_child = whole_tree.get_target_from_children(children_nodes, children, subtree_node)
             else:
-                target_child = Tree.get_target_from_children(whole_tree, children_nodes, children, subtree_node)
+                target_child = whole_tree.get_target_from_children(children_nodes, children, subtree_node)
         else:
             intersection = set(lemma_nodeid_dict[subtree_node]) & children
             if len(intersection) == 0:
-                target_child = Tree.get_target_from_children(whole_tree, children_nodes, children, subtree_node)
+                target_child = whole_tree.get_target_from_children(children_nodes, children, subtree_node)
             else:
                 target_child = list(intersection)[0]
         subtree_children.append(target_child)
@@ -381,7 +360,7 @@ def find_subtree_children(whole_tree, children, subtree, lemma_nodeid_dict, equa
 def find_deep_subtree_children(whole_tree, subtree_children, classes_subtreeid_nodes_list):
     subtree_deep_children = set()
     for subtree_lemma in list(
-            map(lambda x: Tree.get_node(whole_tree, x).lemma, subtree_children)):
+            map(lambda x: whole_tree.get_node(x).lemma, subtree_children)):
         if subtree_lemma in classes_subtreeid_nodes_list.keys():
             subtree_deep_children.update(classes_subtreeid_nodes_list[subtree_lemma])
     subtree_deep_children.update(subtree_children)
@@ -393,7 +372,7 @@ def insert_node_in_tree(whole_tree, existing_node, id_count, subtree_new_label, 
     # add a new node with a new lemma
     new_node = Tree.copy_node_details(existing_node, id_count)
     new_node.lemma = subtree_new_label
-    Tree.add_node_to_dict(whole_tree, new_node)
+    whole_tree.add_node_to_dict(new_node)
     whole_tree.global_similar_mapping[new_node.id] = new_node.id
     if subtree_new_label not in subtree_label_sent.keys():
         subtree_label_sent[subtree_new_label] = [existing_node.sent_name]
@@ -406,7 +385,7 @@ def insert_node_in_tree(whole_tree, existing_node, id_count, subtree_new_label, 
         old_node_new_nodes[node_id].append(new_node.lemma)
     # add an edge to the new node
     edge = Edge(edge_to_curr.node_from, new_node.id, edge_to_curr.weight)
-    Tree.add_edge_to_dict(whole_tree, edge)
+    whole_tree.add_edge_to_dict(edge)
     # add new node to a parent
     parent_subtree_text = str(edge_to_curr.weight) + str(subtree_new_label)
     if parent_subtree_text not in lemma_nodeid_dict.keys():
@@ -427,7 +406,7 @@ def add_additional_child_nodes(additional_child_nodes, lemma_nodeid_dict):
 def add_grouped_lemmas_to_dict(whole_tree, grouped_lemmas, lemma_nodeid_dict):
     for lemma, ids in grouped_lemmas.items():
         for v_id in ids:
-            edge_to_curr = Tree.get_edge(whole_tree, v_id)
+            edge_to_curr = whole_tree.get_edge(v_id)
             if edge_to_curr is not None:
                 label_for_child = str(edge_to_curr[0].weight) + str(lemma)
                 if label_for_child not in lemma_nodeid_dict.keys():
@@ -499,9 +478,9 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
                                                         tree_label)
                 dict_nodeid_comb = get_nodeid_repeats(filtered_combination_ids, str_sequence_help, duplicate_combs)
                 for node_id, node_subtrees in dict_nodeid_comb.items():
-                    existing_node = Tree.get_node(whole_tree, node_id)
-                    edge_to_curr = Tree.get_edge(whole_tree, node_id)[0]
-                    children = Tree.get_children(whole_tree, node_id)
+                    existing_node = whole_tree.get_node(node_id)
+                    edge_to_curr = whole_tree.get_edge(node_id)[0]
+                    children = whole_tree.get_children(node_id)
                     for subtree in node_subtrees:
                         subtree_text = str_sequence_help_reversed.get(tuple(subtree))
                         subtree_new_label = unique_subtrees_mapped_global_subtree_lemma.get(str(lemma) + subtree_text)
@@ -538,11 +517,31 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
                                     classes_subtreeid_nodes_list[subtree_new_label].add(new_node.id)
                                     saved_combinations.append(general_comb)
                             # remove old node and edges to/from it
-                            Tree.add_inactive(whole_tree, node_id)
+                            whole_tree.add_inactive(node_id)
         print(time.time() - start)
     classes_subtreeid_nodes = {k: v for k, v in classes_subtreeid_nodes.items() if
                                len(v) > 1}  # TODO: why do len=1 entries even appear here??
     return classes_subtreeid_nodes, classes_subtreeid_nodes_list
+
+
+def write_in_file(classes_part, classes_part_list, whole_tree):
+    for k, v in classes_part.items():
+        vertex_seq = {}
+        for vertex in v:
+            vertex_seq[vertex] = whole_tree.simple_dfs(vertex, classes_part_list[k])
+        if len(vertex_seq.items()) > 0 and len(vertex_seq[list(vertex_seq)[0]]) > 1:
+            filename = RESULT_PATH + '/results_%s.txt' % (str(k))
+            try:
+                with open(filename, 'w', encoding='utf-8') as filehandle:
+                    target_indices = {v[0][3]: k for k, v in vertex_seq.items()}.values()
+                    vertex_seq_filtered = {k: v for k, v in vertex_seq.items() if k in target_indices}
+                    # better print for testing
+                    # for key, value in vertex_seq_filtered.items():
+                    #     filehandle.write("%s: %s\n" % (key, value))
+                    for _, value in vertex_seq_filtered.items():
+                        filehandle.write("%s: %s\n" % (value[0][3], SPACE.join(list(map(lambda list_entry: list_entry[2], value)))))
+            finally:
+                filehandle.close()
 
 
 def main():
@@ -564,7 +563,7 @@ def main():
     dict_lemmas_rev = {index[0]: lemma for lemma, index in dict_lemmas_full.items()}
     dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
     start = time.time()
-    train_word2vec(trees_full_df, dict_lemmas_full, dict_lemmas, part_of_speech_node_id)
+    # train_word2vec(trees_full_df, dict_lemmas_full, dict_lemmas, part_of_speech_node_id)
     print('Time on word2vec: ' + str(time.time() - start))
 
     start = time.time()
@@ -572,13 +571,13 @@ def main():
     # write_tree_in_table(whole_tree)
     print('Time on constructing the tree: ' + str(time.time() - start))
 
-    Tree.set_help_dict(whole_tree)
+    whole_tree.set_help_dict()
     # partition nodes by height
     start = time.time()
-    Tree.calculate_heights(whole_tree)
+    whole_tree.calculate_heights()
     print('Time on calculating all heights: ' + str(time.time() - start))
 
-    heights_dictionary = {Tree.get_node(whole_tree, node_id): heights for node_id, heights in
+    heights_dictionary = {whole_tree.get_node(node_id): heights for node_id, heights in
                           whole_tree.heights.items()}
     grouped_heights = defaultdict(list)
     for node_1, heights in heights_dictionary.items():
@@ -592,24 +591,7 @@ def main():
     classes_part, classes_part_list = compute_part_subtrees(whole_tree, dict_lemmas_size, grouped_heights)
     # write_tree_in_table(whole_tree)
     print('Time on calculating partial repeats: ' + str(time.time() - start))
-    for k, v in classes_part.items():
-        vertex_seq = {}
-        for vertex in v:
-            vertex_seq[vertex] = Tree.simple_dfs(whole_tree, vertex, classes_part_list[k])
-        if len(vertex_seq.items()) > 0 and len(vertex_seq[list(vertex_seq)[0]]) > 1:
-            filename = RESULT_PATH + '/results_%s.txt' % (str(k))
-            try:
-                with open(filename, 'w', encoding='utf-8') as filehandle:
-                    target_indices = {v[0][3]: k for k, v in vertex_seq.items()}.values()
-                    vertex_seq_filtered = {k: v for k, v in vertex_seq.items() if k in target_indices}
-                    # better print for testing
-                    # for key, value in vertex_seq_filtered.items():
-                    #     filehandle.write("%s: %s\n" % (key, value))
-                    for _, value in vertex_seq_filtered.items():
-                        filehandle.write("%s: %s\n" % (value[0][3], SPACE.join(list(map(lambda list_entry: list_entry[2], value)))))
-            finally:
-                filehandle.close()
-
+    write_in_file(classes_part, classes_part_list, whole_tree)
     merge_in_file()
 
     # TEST
