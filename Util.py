@@ -4,18 +4,9 @@
 
 import csv
 import os
-import re
-import shutil
-
-import numpy as np
-import pandas as pd
 
 from Constants import *
 from Tree import Tree, Node, Edge
-
-pattern_year = re.compile('^[0-9]{4}$')
-pattern_full_date = re.compile('^([0-9]+\.){2}[0-9]+$')
-pattern_part_date = re.compile('^[0-9]+\.[0-9][1-9]+$')
 
 
 def create_needed_directories():
@@ -44,30 +35,6 @@ def write_tree_in_table(whole_tree):
             writer_2.writerow([node.id, (node.lemma, node.form, node.sent_name)])
 
 
-# PRE-PROCESSING
-# method splits input data in 3 datasets:
-# 1) stable (ready to run an algorithm),
-# 2) very long-read (sentences are too long and need to be split in 2 parts),
-# 3) many-rooted (case for compound sentences and incorrect parser's results (Ex: 5 roots in a sentence of length 10)
-# and copies files in corresponding directories
-# fix 2) and 3) manually and then run the main algorithm, which will walk through these directories and add all files.
-def sort_the_data():
-    files = os.listdir(DATA_PATH)
-    df_columns = ['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel']
-    for file in files:
-        full_dir = os.path.join(DATA_PATH, file)
-        with open(full_dir, encoding='utf-8') as f:
-            this_df = pd.read_csv(f, sep='\t', names=df_columns)
-            this_df = this_df[this_df.deprel != 'PUNC']
-        if this_df.groupby(this_df.deprel).get_group('ROOT').shape[0] > 1:
-            shutil.copy(full_dir, MANY_ROOTS_DATA_PATH)
-        elif this_df.shape[0] > 23:
-            name_split = file.split(DOT)
-            shutil.copy(os.path.join(ORIGINAL_DATA_PATH, DOT.join([name_split[0], name_split[1]])), LONG_DATA_PATH)
-        else:
-            shutil.copy(full_dir, STABLE_DATA_PATH)
-
-
 # POST-PROCESSING
 def merge_in_file():
     files = sorted(os.listdir(RESULT_PATH))
@@ -87,31 +54,26 @@ def merge_in_file():
         writer.close()
 
 
-def replace_time_constructions(df):
-    months = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь',
-              'декабрь']
-    day_times = ['утро', 'день', 'вечер', 'ночь']
-    seasons = ['лето', 'осень', 'зима', 'весна']
-    for month in months:
-        df.loc[df['lemma'] == month, 'lemma'] = '#месяц'
-    for day_time in day_times:
-        df.loc[df['lemma'] == day_time, 'lemma'] = '#времясуток'
-    for season in seasons:
-        df.loc[df['lemma'] == season, 'lemma'] = '#сезон'
-    df['lemma'] = df['lemma'].apply(func)
-
-
-def func(lemma):
-    if not pd.isnull(lemma):
-        if pattern_year.match(lemma):
-            return '#год'
-        elif pattern_full_date.match(lemma):
-            return '#пдата'
-        elif pattern_part_date.match(lemma):
-            return '#чдата'
-        elif lemma == '@card@':
-            return '#число'
-    return lemma
+# POST-PROCESSING
+def write_in_file(classes_part, classes_part_list, whole_tree):
+    for k, v in classes_part.items():
+        vertex_seq = {}
+        for vertex in v:
+            vertex_seq[vertex] = whole_tree.simple_dfs(vertex, classes_part_list[k])
+            if len(vertex_seq.items()) > 0 and len(vertex_seq[list(vertex_seq)[0]]) > 1:
+                filename = RESULT_PATH + '/results_%s.txt' % (str(k))
+                try:
+                    with open(filename, 'w', encoding='utf-8') as filehandle:
+                        target_indices = {v[0][3]: k for k, v in vertex_seq.items()}.values()
+                        vertex_seq_filtered = {k: v for k, v in vertex_seq.items() if k in target_indices}
+                        # better print for testing
+                        # for key, value in vertex_seq_filtered.items():
+                        #     filehandle.write("%s: %s\n" % (key, value))
+                        for _, value in vertex_seq_filtered.items():
+                            filehandle.write("%s: %s\n" % (
+                            value[0][3], SPACE.join(list(map(lambda list_entry: list_entry[2], value)))))
+                finally:
+                    filehandle.close()
 
 
 def get_test_tree():
@@ -152,30 +114,6 @@ def get_test_tree():
     Tree.add_edge(test_tree, Edge(2, 5, 20))
     Tree.add_edge(test_tree, Edge(12, 15, 20))
     return test_tree
-
-
-# compare new sentences with existent, pick ones that don't duplicate
-def pick_new_sentences():
-    existing_sent = []
-    existing_len = []
-    files = os.listdir(DATA_PATH)
-    df_columns = ['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel']
-    for file in files:
-        full_dir = os.path.join(DATA_PATH, file)
-        with open(full_dir, encoding='utf-8') as f:
-            this_df = pd.read_csv(f, sep='\t', names=df_columns)
-            sent_str = EMPTY_STR.join(list(this_df.form))
-            existing_sent.append(sent_str)
-            existing_len.append(len(sent_str))
-    files_new = os.listdir(r"parus_results_tags_additional")
-    for file in files_new:
-        full_dir = os.path.join(r"parus_results_tags_additional", file)
-        with open(full_dir, encoding='utf-8') as f:
-            this_df = pd.read_csv(f, sep='\t', names=df_columns)
-            sent_str = EMPTY_STR.join(list(this_df.form))
-            if len(sent_str) not in existing_len:
-                if sent_str not in existing_sent:
-                    shutil.copy(full_dir, "brand_new_sentences")
 
 
 def new_test():
