@@ -163,7 +163,7 @@ class Tree:
                 else:
                     all_visited_flag = True
                     for child in children:
-                        if child in subtree_vertices and curr not in visited:
+                        if child in subtree_vertices and child not in visited:
                             all_visited_flag = False
                             stack.append(child)
                             node = self.get_node(child)

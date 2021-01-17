@@ -22,11 +22,13 @@ def read_data():
     df_columns = ['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel']
     full_df = []
     stable_df = []
+    long_df = []
     for file in files:
         full_dir = os.path.join(DATA_PATH, file)
         name = file.split('.')[0]
         with open(full_dir, encoding='utf-8') as f:
             this_df = pd.read_csv(f, sep='\t', names=df_columns)
+            this_df_filtered = this_df[this_df.deprel != 'PUNC']
             if this_df['id'].duplicated().any():
                 start_of_subtree_df = list(this_df.groupby(this_df.id).get_group(1).index)
                 boundaries = start_of_subtree_df + [max(list(this_df.index)) + 1]
@@ -39,12 +41,15 @@ def read_data():
                     local_counter += 1
             else:
                 this_df['sent_name'] = name
-                stable_df.append(this_df)           # for strong equality
-                # if this_df.shape[0] < 24:         # for word2vec
-                #     stable_df.append(this_df)
+                # stable_df.append(this_df)           # for strong equality
+                if this_df_filtered.shape[0] < 25:  # for word2vec
+                    stable_df.append(this_df)
+                else:
+                    long_df.append(this_df)
                 full_df.append(this_df)
 
     trees_df = pd.concat(stable_df, axis=0, ignore_index=True)
+    # long_df = pd.concat(long_df, axis=0, ignore_index=True)
     # delete useless data
     trees_df = trees_df.drop(columns=['xpostag', 'feats'], axis=1)
     # trees_df.drop(index=[11067], inplace=True)
@@ -80,7 +85,7 @@ def read_data():
     return trees_full_df, trees_df_filtered
 
 
-def train_word2vec(trees_df_filtered, lemmas, dict_lemmas_3, part_of_speech_node_id):
+def train_word2vec(trees_df_filtered):
     lemma_sent_df = trees_df_filtered[['lemma', 'sent_name']]
     lemma_sent_dict = {}
     for name, group in lemma_sent_df.groupby('sent_name'):
@@ -96,6 +101,11 @@ def train_word2vec(trees_df_filtered, lemmas, dict_lemmas_3, part_of_speech_node
     medical_model.build_vocab([list(additional_model.vocab.keys())[:UPPER_BOUND_ADDITIONAL_DATA]], update=True)
     medical_model.intersect_word2vec_format(ADDITIONAL_CORPUS_PATH, binary=True, lockf=1.0, unicode_errors='ignore')
     medical_model.train(sentences, total_examples=UPPER_BOUND_ADDITIONAL_DATA, epochs=medical_model.iter)
+    medical_model.save("trained.model")
+
+
+def load_trained_word2vec(lemmas, dict_lemmas_3, part_of_speech_node_id):
+    medical_model = Word2Vec.load("trained.model")
     similar_dict = {lemma: medical_model.most_similar(lemma, topn=15) for lemma in lemmas if not pattern.match(lemma)}
     similar_lemmas_dict = {}
     for lemma, similar_lemmas in similar_dict.items():
@@ -125,7 +135,7 @@ def train_word2vec(trees_df_filtered, lemmas, dict_lemmas_3, part_of_speech_node
                 dict_lemmas_3[lemma].append(lemmas[similar_lemma][0])
 
 
-def construct_tree(trees_df_filtered, dict_lemmas, dict_rel, dict_lemmas_rev):
+def construct_tree(trees_df_filtered, dict_lemmas, dict_rel):
     # construct a tree with a list of edges and a list of nodes
     whole_tree = Tree()
     root_node = Node(0, 0)  # add root
@@ -529,23 +539,24 @@ def write_in_file(classes_part, classes_part_list, whole_tree):
         vertex_seq = {}
         for vertex in v:
             vertex_seq[vertex] = whole_tree.simple_dfs(vertex, classes_part_list[k])
-        if len(vertex_seq.items()) > 0 and len(vertex_seq[list(vertex_seq)[0]]) > 1:
-            filename = RESULT_PATH + '/results_%s.txt' % (str(k))
-            try:
-                with open(filename, 'w', encoding='utf-8') as filehandle:
-                    target_indices = {v[0][3]: k for k, v in vertex_seq.items()}.values()
-                    vertex_seq_filtered = {k: v for k, v in vertex_seq.items() if k in target_indices}
-                    # better print for testing
-                    # for key, value in vertex_seq_filtered.items():
-                    #     filehandle.write("%s: %s\n" % (key, value))
-                    for _, value in vertex_seq_filtered.items():
-                        filehandle.write("%s: %s\n" % (value[0][3], SPACE.join(list(map(lambda list_entry: list_entry[2], value)))))
-            finally:
-                filehandle.close()
+            if len(vertex_seq.items()) > 0 and len(vertex_seq[list(vertex_seq)[0]]) > 1:
+                filename = RESULT_PATH + '/results_%s.txt' % (str(k))
+                try:
+                    with open(filename, 'w', encoding='utf-8') as filehandle:
+                        target_indices = {v[0][3]: k for k, v in vertex_seq.items()}.values()
+                        vertex_seq_filtered = {k: v for k, v in vertex_seq.items() if k in target_indices}
+                        # better print for testing
+                        # for key, value in vertex_seq_filtered.items():
+                        #     filehandle.write("%s: %s\n" % (key, value))
+                        for _, value in vertex_seq_filtered.items():
+                            filehandle.write("%s: %s\n" % (
+                            value[0][3], SPACE.join(list(map(lambda list_entry: list_entry[2], value)))))
+                finally:
+                    filehandle.close()
 
 
 def main():
-    merge_in_file()
+    # merge_in_file()
     # create_needed_directories()
     # sort_the_data()
     # pick_new_sentences()
@@ -560,14 +571,18 @@ def main():
     dict_lemmas = {lemma: [index] for index, lemma in enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
     dict_lemmas_full = {lemma: [index] for index, lemma in
                         enumerate(dict.fromkeys(trees_full_df['lemma'].to_list()), 1)}
-    dict_lemmas_rev = {index[0]: lemma for lemma, index in dict_lemmas_full.items()}
     dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
-    start = time.time()
-    # train_word2vec(trees_full_df, dict_lemmas_full, dict_lemmas, part_of_speech_node_id)
-    print('Time on word2vec: ' + str(time.time() - start))
+    if RUN_WITH_W2V:
+        start = time.time()
+        if LOAD_TRAINED:
+            load_trained_word2vec(dict_lemmas_full, dict_lemmas, part_of_speech_node_id)
+        else:
+            train_word2vec(trees_full_df)
+            load_trained_word2vec(dict_lemmas_full, dict_lemmas, part_of_speech_node_id)
+        print('Time on word2vec: ' + str(time.time() - start))
 
     start = time.time()
-    whole_tree = construct_tree(trees_df_filtered, dict_lemmas, dict_rel, dict_lemmas_rev)
+    whole_tree = construct_tree(trees_df_filtered, dict_lemmas, dict_rel)
     # write_tree_in_table(whole_tree)
     print('Time on constructing the tree: ' + str(time.time() - start))
 
