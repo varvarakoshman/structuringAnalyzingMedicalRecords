@@ -11,6 +11,18 @@ import re
 pattern_year = re.compile('^[0-9]{4}$')
 pattern_full_date = re.compile('^([0-9]+\.){2}[0-9]+$')
 pattern_part_date = re.compile('^[0-9]+\.[0-9][1-9]+$')
+only_letters = re.compile("^[a-zA-Z]+$")
+
+
+def read_vidal():
+    df_columns = ['INN', 'MNN', 'DrugsSingle', 'DrugsMultiple', 'Group', 'Interactions', 'Indications', 'Contraindications']
+    with open('data/dataset_vidal_inns.csv', encoding='utf-8') as f:
+        this_df = pd.read_csv(f, sep=';', names=df_columns)
+    medications = [ent for ent in list(this_df['DrugsSingle']) if isinstance(ent, str)]
+    result_set = set([m for med in medications for m in med.split('\\n')])
+    replaced = [res.replace('®', '') for res in result_set]
+    df = pd.DataFrame(replaced, columns=['Name'])
+    df.to_csv("medicalTextTrees/vidal.csv", sep=',', encoding='utf-8')
 
 
 def read_data():
@@ -19,6 +31,7 @@ def read_data():
     full_df = []
     stable_df = []
     long_df = []
+    c = 0
     for file in files:
         full_dir = os.path.join(DATA_PATH, file)
         name = file.split('.')[0]
@@ -39,6 +52,7 @@ def read_data():
                 this_df['sent_name'] = name
                 # stable_df.append(this_df)           # for strong equality
                 if this_df_filtered.shape[0] < 25:  # for word2vec
+                    c += 1
                     stable_df.append(this_df)
                 else:
                     long_df.append(this_df)
@@ -70,7 +84,8 @@ def read_data():
         trees_df_filtered.loc[num, 'upostag'] = 'Num'
         trees_full_df.loc[num, 'upostag'] = 'Num'
 
-    # target_sents = list({'44112_8', '38674_5', '55654_2', '35628_5', '32867_6', '57809_7', '57126_7'})  # TEST
+    # target_sents = list({'40547_61', '37462_126', '40547_41', '37462_41', '37462_106', '38897_1', '48813_3_1',
+    #                      '48690_1_1', '32452_1', '31635_0_1', '43772_1_1', '40547_12', '37462_77', '37462_12'})  # TEST
     # target_sents = list({'32867_6', '57809_7', '57126_7'})  # TEST
     # target_sents = list({'55338_41', '58401_7'})  # TEST
     # target_sents = list({'32191_2', '58282_3', '55066_0', '46855_3', '48408_0', '37676_3',

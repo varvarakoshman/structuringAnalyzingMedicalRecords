@@ -10,6 +10,7 @@ CLASSIFIED_DATA_PATH = "medicalTextTrees/classified_sentences"
 LONG_DATA_PATH = "medicalTextTrees/classified_sentences/long_sentences"
 STABLE_DATA_PATH = "medicalTextTrees/classified_sentences/stable_sentences"
 MANY_ROOTS_DATA_PATH = "medicalTextTrees/classified_sentences/many_roots_sentences"
+VIS_PATH = "medicalTextTrees/merged_extended_visualize.txt"
 
 # Word2vec training constants
 UPPER_BOUND_ADDITIONAL_DATA = 50000
@@ -21,3 +22,4 @@ RUN_WITH_W2V = True
 EMPTY_STR = ""
 DOT = "."
 SPACE = " "
+NEW_LINE = "\n"

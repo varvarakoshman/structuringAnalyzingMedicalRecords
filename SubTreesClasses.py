@@ -6,7 +6,7 @@ from Preprocessing import read_data, replace_time_constructions
 from Tree import Tree, Node, Edge
 from W2Vprocessing import load_trained_word2vec, train_word2vec
 from Constants import *
-from Util import merge_in_file, write_in_file
+from Util import merge_in_file, write_in_file, write_tree_in_table, read_med_data, label_classes, draw_histogram
 
 
 def construct_tree(trees_df_filtered, dict_lemmas, dict_rel):
@@ -413,6 +413,7 @@ def main():
     # create_needed_directories()
     # sort_the_data()
     # pick_new_sentences()
+    draw_histogram()
     start = time.time()
     trees_full_df, trees_df_filtered = read_data()
     replace_time_constructions(trees_df_filtered)
@@ -422,9 +423,11 @@ def main():
 
     # get all lemmas and create a dictionary to map to numbers
     dict_lemmas = {lemma: [index] for index, lemma in enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
+    dict_form_lemma = dict(zip(trees_df_filtered['form'].to_list(), trees_df_filtered['lemma'].to_list()))
     dict_lemmas_full = {lemma: [index] for index, lemma in
                         enumerate(dict.fromkeys(trees_full_df['lemma'].to_list()), 1)}
     dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
+    dict_rel_rev = {v: k for k, v in dict_rel.items()}
     if RUN_WITH_W2V:
         start = time.time()
         if LOAD_TRAINED:
@@ -457,10 +460,11 @@ def main():
     # classes for partial repeats
     start = time.time()
     classes_part, classes_part_list = compute_part_subtrees(whole_tree, dict_lemmas_size, grouped_heights)
-    # write_tree_in_table(whole_tree)
     print('Time on calculating partial repeats: ' + str(time.time() - start))
-    write_in_file(classes_part, classes_part_list, whole_tree)
+    classes_words = write_in_file(classes_part, classes_part_list, whole_tree)
+    labels = label_classes(classes_words, dict_form_lemma)
     merge_in_file()
+    write_tree_in_table(whole_tree, dict_rel_rev, labels)
 
     # TEST
     # test_tree = Util.get_test_tree()
