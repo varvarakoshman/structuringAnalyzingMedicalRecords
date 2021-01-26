@@ -59,13 +59,19 @@ def read_data():
                 full_df.append(this_df)
 
     trees_df = pd.concat(stable_df, axis=0, ignore_index=True)
-    # long_df = pd.concat(long_df, axis=0, ignore_index=True)
+    long_df = pd.concat(long_df, axis=0, ignore_index=True)
     # delete useless data
     trees_df = trees_df.drop(columns=['xpostag', 'feats'], axis=1)
     # trees_df.drop(index=[11067], inplace=True)
     trees_df.loc[13742, 'deprel'] = 'разъяснит'
 
     # delete relations of type PUNC and reindex
+
+    long_df = long_df.drop(columns=['xpostag', 'feats'], axis=1)
+    long_df_filtered = long_df[long_df.deprel != 'PUNC']
+    long_df_filtered = long_df_filtered.reset_index(drop=True)
+    long_df_filtered.index = long_df_filtered.index + 1
+
     trees_df_filtered = trees_df[trees_df.deprel != 'PUNC']
     trees_df_filtered = trees_df_filtered.reset_index(drop=True)
     trees_df_filtered.index = trees_df_filtered.index + 1
@@ -93,7 +99,7 @@ def read_data():
     # trees_df_filtered = trees_df_filtered.loc[trees_df_filtered.sent_name.isin(target_sents)]  # TEST
     # trees_full_df.loc[trees_full_df.index.isin(replaced_numbers)].assign(upostag = 'N')
 
-    return trees_full_df, trees_df_filtered
+    return trees_full_df, trees_df_filtered, long_df_filtered
 
 
 # PRE-PROCESSING
