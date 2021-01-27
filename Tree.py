@@ -3,12 +3,13 @@ from queue import LifoQueue
 
 
 class Node:
-    def __init__(self, id, lemma=None, form=None, sent_name=None, is_included=False):
+    def __init__(self, id, lemma=None, form=None, sent_name=None, is_included=False, res_class=None):
         self.id = id
         self.lemma = lemma
         self.form = form
         self.sent_name = sent_name
         self.is_included = is_included
+        self.res_class = res_class
 
 
 class Edge:

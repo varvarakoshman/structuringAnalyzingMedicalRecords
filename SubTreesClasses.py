@@ -1,138 +1,12 @@
-import csv
-import os
-import pprint
-import re
 import time
 from collections import defaultdict
 from itertools import combinations, product
 
-import pandas as pd
-from gensim.models import Word2Vec, KeyedVectors
-
+from Preprocessing import read_data, replace_time_constructions
 from Tree import Tree, Node, Edge
 from Constants import *
-from Util import create_needed_directories, sort_the_data, replace_time_constructions, pick_new_sentences, \
-    merge_in_file, write_tree_in_table
-
-pattern = re.compile('^#.+$')
-
-
-def read_data():
-    files = os.listdir(DATA_PATH)
-    df_columns = ['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel']
-    full_df = []
-    stable_df = []
-    long_df = []
-    for file in files:
-        full_dir = os.path.join(DATA_PATH, file)
-        name = file.split('.')[0]
-        with open(full_dir, encoding='utf-8') as f:
-            this_df = pd.read_csv(f, sep='\t', names=df_columns)
-            this_df_filtered = this_df[this_df.deprel != 'PUNC']
-            if this_df['id'].duplicated().any():
-                start_of_subtree_df = list(this_df.groupby(this_df.id).get_group(1).index)
-                boundaries = start_of_subtree_df + [max(list(this_df.index)) + 1]
-                list_of_dfs = [this_df.iloc[boundaries[n]:boundaries[n + 1]] for n in range(len(boundaries) - 1)]
-                local_counter = 1
-                for df in list_of_dfs:
-                    df['sent_name'] = name + '_' + str(local_counter)
-                    full_df.append(df)
-                    stable_df.append(df)
-                    local_counter += 1
-            else:
-                this_df['sent_name'] = name
-                # stable_df.append(this_df)           # for strong equality
-                if this_df.shape[0] < 23:         # for word2vec
-                    stable_df.append(this_df)
-                else:
-                    long_df.append(this_df)
-                full_df.append(this_df)
-
-    trees_df = pd.concat(stable_df, axis=0, ignore_index=True)
-    # long_df = pd.concat(long_df, axis=0, ignore_index=True)
-    # delete useless data
-    trees_df = trees_df.drop(columns=['xpostag', 'feats'], axis=1)
-    # trees_df.drop(index=[11067], inplace=True)
-    trees_df.loc[13742, 'deprel'] = 'разъяснит'
-
-    # delete relations of type PUNC and reindex
-    trees_df_filtered = trees_df[trees_df.deprel != 'PUNC']
-    trees_df_filtered = trees_df_filtered.reset_index(drop=True)
-    trees_df_filtered.index = trees_df_filtered.index + 1
-    # trees_df_filtered.loc[12239, 'deprel'] = '1-компл'
-    # trees_df_filtered.loc[12239, 'head'] = 2
-
-    trees_full_df = pd.concat(full_df, axis=0, ignore_index=True)
-    trees_full_df = trees_full_df.reset_index(drop=True)
-    trees_full_df.index = trees_full_df.index + 1
-    trees_full_df.drop(columns=['upostag', 'xpostag', 'feats'], axis=1)
-    trees_full_df = trees_full_df[trees_full_df.deprel != 'PUNC']
-
-    replaced_numbers = [k for k, v in trees_full_df.lemma.str.contains('#').to_dict().items() if
-                        v == True]
-    for num in replaced_numbers:
-        trees_df_filtered.loc[num, 'upostag'] = 'Num'
-        trees_full_df.loc[num, 'upostag'] = 'Num'
-
-    # target_sents = list({'44112_8', '38674_5', '55654_2', '35628_5', '32867_6', '57809_7', '57126_7'})  # TEST
-    # target_sents = list({'32867_6', '57809_7', '57126_7'})  # TEST
-    # target_sents = list({'55338_41', '58401_7'})  # TEST
-    # target_sents = list({'32191_2', '58282_3', '55066_0', '46855_3', '48408_0', '37676_3',
-    #                      '32191_0', '56109_5', '56661_0', '54743_1'}) # TEST
-    # trees_df_filtered = trees_df_filtered.loc[trees_df_filtered.sent_name.isin(target_sents)]  # TEST
-    # trees_full_df.loc[trees_full_df.index.isin(replaced_numbers)].assign(upostag = 'N')
-
-    return trees_full_df, trees_df_filtered
-
-
-def train_word2vec(trees_df_filtered):
-    lemma_sent_df = trees_df_filtered[['lemma', 'sent_name']]
-    lemma_sent_dict = {}
-    for name, group in lemma_sent_df.groupby('sent_name'):
-        lemma_sent_dict[name] = []
-        for _, row in group.iterrows():
-            lemma_sent_dict[name].append(row['lemma'])
-    sentences = list(lemma_sent_dict.values())
-
-    medical_model = Word2Vec(min_count=1)
-    medical_model.build_vocab(sentences)
-
-    additional_model = KeyedVectors.load_word2vec_format(ADDITIONAL_CORPUS_PATH, binary=True, unicode_errors='ignore')
-    medical_model.build_vocab([list(additional_model.vocab.keys())[:UPPER_BOUND_ADDITIONAL_DATA]], update=True)
-    medical_model.intersect_word2vec_format(ADDITIONAL_CORPUS_PATH, binary=True, lockf=1.0, unicode_errors='ignore')
-    medical_model.train(sentences, total_examples=UPPER_BOUND_ADDITIONAL_DATA, epochs=medical_model.iter)
-    medical_model.save("trained.model")
-
-
-def load_trained_word2vec(lemmas, dict_lemmas_3, part_of_speech_node_id):
-    medical_model = Word2Vec.load("trained.model")
-    similar_dict = {lemma: medical_model.most_similar(lemma, topn=15) for lemma in lemmas if not pattern.match(lemma)}
-    similar_lemmas_dict = {}
-    for lemma, similar_lemmas in similar_dict.items():
-        for similar_lemma, cosine_dist in similar_lemmas:
-            if cosine_dist > HIGH_COSINE_DIST and similar_lemma in lemmas.keys() \
-                    and part_of_speech_node_id[similar_lemma] == part_of_speech_node_id[lemma]:
-                if lemma not in similar_lemmas_dict.keys():
-                    similar_lemmas_dict[lemma] = [similar_lemma]
-                else:
-                    similar_lemmas_dict[lemma].append(similar_lemma)
-    all_values = [item for sublist in similar_lemmas_dict.values() for item in sublist]
-    most_freq = set([i for i in all_values if all_values.count(i) > 11])
-    similar_lemmas_dict_filtered = {}
-    for k, v in similar_lemmas_dict.items():
-        stable = set(v) - most_freq
-        if 0 < len(stable) <= 10:
-            similar_lemmas_dict_filtered[k] = stable
-
-    # pprint.pprint(similar_lemmas_dict_filtered)
-    for lemma, similar_lemmas in similar_lemmas_dict_filtered.items():
-        for similar_lemma in similar_lemmas:
-            lemmas[lemma].append(lemmas[similar_lemma][0])
-    # pprint.pprint(lemmas)
-    for lemma, similar_lemmas in similar_lemmas_dict_filtered.items():
-        for similar_lemma in similar_lemmas:
-            if lemma in dict_lemmas_3.keys():
-                dict_lemmas_3[lemma].append(lemmas[similar_lemma][0])
+from Util import create_needed_directories, merge_in_file, write_in_file
+from W2Vprocessing import load_trained_word2vec, train_word2vec
 
 
 def construct_tree(trees_df_filtered, dict_lemmas, dict_rel):
@@ -534,32 +408,12 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
     return classes_subtreeid_nodes, classes_subtreeid_nodes_list
 
 
-def write_in_file(classes_part, classes_part_list, whole_tree):
-    for k, v in classes_part.items():
-        vertex_seq = {}
-        for vertex in v:
-            vertex_seq[vertex] = whole_tree.simple_dfs(vertex, classes_part_list[k])
-            if len(vertex_seq.items()) > 0 and len(vertex_seq[list(vertex_seq)[0]]) > 1:
-                filename = RESULT_PATH + '/results_%s.txt' % (str(k))
-                try:
-                    with open(filename, 'w', encoding='utf-8') as filehandle:
-                        target_indices = {v[0][3]: k for k, v in vertex_seq.items()}.values()
-                        vertex_seq_filtered = {k: v for k, v in vertex_seq.items() if k in target_indices}
-                        # better print for testing
-                        # for key, value in vertex_seq_filtered.items():
-                        #     filehandle.write("%s: %s\n" % (key, value))
-                        for _, value in vertex_seq_filtered.items():
-                            filehandle.write("%s: %s\n" % (
-                            value[0][3], SPACE.join(list(map(lambda list_entry: list_entry[2], value)))))
-                finally:
-                    filehandle.close()
-
-
 def main():
     # merge_in_file()
     # create_needed_directories()
     # sort_the_data()
     # pick_new_sentences()
+    # draw_histogram()
     start = time.time()
     trees_full_df, trees_df_filtered = read_data()
     replace_time_constructions(trees_df_filtered)
@@ -609,6 +463,7 @@ def main():
     print('Time on calculating partial repeats: ' + str(time.time() - start))
     write_in_file(classes_part, classes_part_list, whole_tree)
     merge_in_file()
+    gg = []
 
     # TEST
     # test_tree = Util.get_test_tree()
