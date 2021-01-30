@@ -26,7 +26,7 @@ def train_word2vec(trees_df_filtered):
 
 def load_trained_word2vec(lemmas, dict_lemmas_3, part_of_speech_node_id):
     medical_model = Word2Vec.load("trained.model")
-    similar_dict = {lemma: medical_model.most_similar(lemma, topn=15) for lemma in lemmas if not pattern.match(lemma)}
+    similar_dict = {lemma: medical_model.most_similar(lemma, topn=10) for lemma in lemmas if not pattern.match(lemma)}
     similar_lemmas_dict = {}
     for lemma, similar_lemmas in similar_dict.items():
         for similar_lemma, cosine_dist in similar_lemmas:
@@ -37,7 +37,7 @@ def load_trained_word2vec(lemmas, dict_lemmas_3, part_of_speech_node_id):
                 else:
                     similar_lemmas_dict[lemma].append(similar_lemma)
     all_values = [item for sublist in similar_lemmas_dict.values() for item in sublist]
-    most_freq = set([i for i in all_values if all_values.count(i) > 11])
+    most_freq = set([i for i in all_values if all_values.count(i) > 12])
     similar_lemmas_dict_filtered = {}
     for k, v in similar_lemmas_dict.items():
         stable = set(v) - most_freq

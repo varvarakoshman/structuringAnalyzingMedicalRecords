@@ -34,20 +34,26 @@ def read_data():
             else:
                 this_df['sent_name'] = name
                 # stable_df.append(this_df)           # for strong equality
-                if this_df.shape[0] < 23:         # for word2vec
+                if this_df_filtered.shape[0] < 23:         # for word2vec
                     stable_df.append(this_df)
                 else:
                     long_df.append(this_df)
                 full_df.append(this_df)
 
     trees_df = pd.concat(stable_df, axis=0, ignore_index=True)
-    # long_df = pd.concat(long_df, axis=0, ignore_index=True)
+    long_df = pd.concat(long_df, axis=0, ignore_index=True)
     # delete useless data
     trees_df = trees_df.drop(columns=['xpostag', 'feats'], axis=1)
     # trees_df.drop(index=[11067], inplace=True)
     trees_df.loc[13742, 'deprel'] = 'разъяснит'
 
     # delete relations of type PUNC and reindex
+
+    long_df = long_df.drop(columns=['xpostag', 'feats'], axis=1)
+    long_df_filtered = long_df[long_df.deprel != 'PUNC']
+    long_df_filtered = long_df_filtered.reset_index(drop=True)
+    long_df_filtered.index = long_df_filtered.index + 1
+
     trees_df_filtered = trees_df[trees_df.deprel != 'PUNC']
     trees_df_filtered = trees_df_filtered.reset_index(drop=True)
     trees_df_filtered.index = trees_df_filtered.index + 1
@@ -63,8 +69,12 @@ def read_data():
     replaced_numbers = [k for k, v in trees_full_df.lemma.str.contains('#').to_dict().items() if
                         v == True]
     for num in replaced_numbers:
-        trees_df_filtered.loc[num, 'upostag'] = 'Num'
         trees_full_df.loc[num, 'upostag'] = 'Num'
+
+    replaced_numbers = [k for k, v in trees_df_filtered.lemma.str.contains('#').to_dict().items() if
+                        v == True]
+    for num in replaced_numbers:
+        trees_df_filtered.loc[num, 'upostag'] = 'Num'
 
     # target_sents = list({'44112_8', '38674_5', '55654_2', '35628_5', '32867_6', '57809_7', '57126_7'})  # TEST
     # target_sents = list({'32867_6', '57809_7', '57126_7'})  # TEST
@@ -74,7 +84,7 @@ def read_data():
     # trees_df_filtered = trees_df_filtered.loc[trees_df_filtered.sent_name.isin(target_sents)]  # TEST
     # trees_full_df.loc[trees_full_df.index.isin(replaced_numbers)].assign(upostag = 'N')
 
-    return trees_full_df, trees_df_filtered
+    return trees_full_df, trees_df_filtered, long_df_filtered
 
 
 # PRE-PROCESSING

@@ -112,34 +112,19 @@ def draw_histogram():
             res_len[val] = 1
         else:
             res_len[val] += 1
-    # res2 = dict(sorted(res.items(), key=lambda x: x[1], reverse=True))
-    # res2 = OrderedDict(sorted(res2.items(), key=lambda x: (-x[1], x[0]), reverse=True))
-    # plt.hist(list(group_len.values()), color='green')
-    # plt.xlabel("Runs/Delivery")
-    # plt.ylabel("Frequency")
-    # plt.xticks(range(1, 49))
-    # plt.yticks(range(1, 20))
-    # plt.title('Champions Trophy 2017 Final\n Runs scored in 3 overs')
-    # plt.show()
 
-    #
-    # ax = sns.barplot(x=alphab, y=frequencies, color='blue')
-    # ax.set(xlabel='Class size', ylabel='Number of classes')
-    # ax.set(xticks=np.arange(len(alphab)))
-    # plt.show()
-
-    res2 = dict(sorted(res.items(), key=lambda x: x[0], reverse=True))
-    alphab = list(res2.keys())
-    frequencies = list(res2.values())
+    res2 = dict(sorted(res.items(), key=lambda x: x[0]))
+    alphab = list(res2.values())
+    frequencies = list(res2.keys())
 
     pos = np.arange(len(frequencies))
     ax = plt.axes()
     ax.set_xticks(pos)
     ax.set_xticklabels(frequencies)
-    ax.set_xlabel('Number of classes')
-    ax.set_ylabel('Class size')
+    ax.set_xlabel('Размер класса')
+    ax.set_ylabel('Число классов')
     plt.bar(pos, alphab, width=0.8, color='b', align='center')
-    # plt.title('')
+    plt.title('Число классов с равным числом повторов')
     plt.show()
 
     alphab = list(res_len.values())
@@ -149,11 +134,12 @@ def draw_histogram():
     ax = plt.axes()
     ax.set_xticks(pos)
     ax.set_xticklabels(frequencies)
-    ax.set_xlabel('Class length')
-    ax.set_ylabel('Number of classes')
-    plt.bar(pos, alphab, width=0.8, color='b', align='center')
-    # plt.title('')
+    ax.set_xlabel('Объем класса')
+    ax.set_ylabel('Число классов')
+    plt.bar(pos, alphab, width=0.4, color='b', align='center')
+    plt.title('Число классов с равным числом слов в повторе')
     plt.show()
+
 
 def get_test_tree():
     test_tree = Tree()
