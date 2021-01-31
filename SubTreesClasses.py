@@ -113,7 +113,7 @@ def add_additional_children_to_parents(k_2, whole_tree, all_parents):
     return additional_child_nodes
 
 
-def produce_combinations(k_2, v_id, str_sequence_help, str_sequence_help_reversed, equal_nodes, equal_nodes_mapping, stat_dict):
+def produce_combinations(k_2, v_id, str_sequence_help, str_sequence_help_reversed, equal_nodes, equal_nodes_mapping):
     if v_id == 1194:
         rrrr = []
     if len(equal_nodes) > 0:
@@ -147,24 +147,18 @@ def produce_combinations(k_2, v_id, str_sequence_help, str_sequence_help_reverse
         list_for_combinations = k_2[v_id]
         all_combinations = [list(combinations(list_for_combinations, i)) for i in
                             range(1, len(list_for_combinations) + 1)]
-    return get_strings_from_combinations(all_combinations, v_id, str_sequence_help, str_sequence_help_reversed, stat_dict)
+    return get_strings_from_combinations(all_combinations, v_id, str_sequence_help, str_sequence_help_reversed)
 
 
-def get_strings_from_combinations(all_combinations, v_id, str_sequence_help, str_sequence_help_reversed, stat_dict):
+def get_strings_from_combinations(all_combinations, v_id, str_sequence_help, str_sequence_help_reversed):
     all_combinations_str_joined = set()
     new_local_duplicates = {}
     for comb in all_combinations:
         for tup in comb:
             combs = [str(item) for item in sorted(tup)]
             joined_label = EMPTY_STR.join(combs)
-            l = len(joined_label)
-            if l in stat_dict.keys():
-                stat_dict[l] = stat_dict[l] + 1
-            else:
-                stat_dict[l] = 1
             if joined_label not in str_sequence_help.keys():
-                str_sequence_help[joined_label] = [combs.copy()]
-                # str_sequence_help[joined_label].append(combs)
+                str_sequence_help[joined_label] = [combs.copy(), combs]
             if joined_label in str_sequence_help.keys():
                 new_local_duplicates[v_id] = combs
             all_combinations_str_joined.add(joined_label)
@@ -174,12 +168,12 @@ def get_strings_from_combinations(all_combinations, v_id, str_sequence_help, str
 
 def get_nodeid_repeats(filtered_combination_ids, str_sequence_help, duplicate_combs):
     dict_nodeid_comb = {}
-    for k, v in filtered_combination_ids.items():
-        for v_i in v:
-            if len(str_sequence_help.get(k)) > 1:
+    for subtree_label, v_ids in filtered_combination_ids.items():
+        for v_i in v_ids:
+            if len(str_sequence_help.get(subtree_label)) > 2:
                 subtree_comb = duplicate_combs[v_i]
             else:
-                subtree_comb = str_sequence_help.get(k)[0]
+                subtree_comb = str_sequence_help.get(subtree_label)[0]
             if v_i in dict_nodeid_comb.keys():
                 dict_nodeid_comb[v_i].append(subtree_comb)
             else:
@@ -321,7 +315,6 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
     subtree_label_sent = {}
     k_2 = {}  # identifiers of edges of subtrees
     lemma_nodeid_dict = {}
-    stat_dict = {}
     saved_combinations = []
     id_count = sorted([node.id for node in whole_tree.nodes], reverse=True)[0] + 1
     for nodes in grouped_heights:
@@ -351,7 +344,7 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
                                                                                              str_sequence_help,
                                                                                              str_sequence_help_reversed,
                                                                                              equal_nodes,
-                                                                                             equal_nodes_mapping, stat_dict)
+                                                                                             equal_nodes_mapping)
                     for label in all_combinations_str_joined:
                         if label in combination_ids.keys():
                             combination_ids[label].append(v_id)
@@ -411,20 +404,6 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
         print(time.time() - start)
     classes_subtreeid_nodes = {k: v for k, v in classes_subtreeid_nodes.items() if
                                len(v) > 1}  # TODO: why do len=1 entries even appear here??
-
-    res2 = dict(sorted(stat_dict.items(), key=lambda x: x[0]))
-    alphab = list(res2.values())
-    frequencies = list(res2.keys())
-
-    pos = np.arange(len(frequencies))
-    ax = plt.axes()
-    ax.set_xticks(pos)
-    ax.set_xticklabels(frequencies)
-    ax.set_xlabel('Длина метки')
-    ax.set_ylabel('Число вершин с такой меткой')
-    plt.bar(pos, alphab, width=0.8, color='b', align='center')
-    plt.title('Число классов с равным числом повторов')
-    plt.show()
     return classes_subtreeid_nodes, classes_subtreeid_nodes_list
 
 
