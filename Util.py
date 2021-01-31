@@ -61,6 +61,7 @@ def write_in_file(classes_part, classes_part_list, whole_tree):
     for k, v in classes_part.items():
         vertex_seq = {}
         for vertex in v:
+            curr_height = max(whole_tree.heights[vertex])
             vertex_seq[vertex] = whole_tree.simple_dfs(vertex, classes_part_list[k])
             if len(vertex_seq.items()) > 0 and len(vertex_seq[list(vertex_seq)[0]]) > 1:
                 filename = RESULT_PATH + '/results_%s.txt' % (str(k))
@@ -72,8 +73,7 @@ def write_in_file(classes_part, classes_part_list, whole_tree):
                         # for key, value in vertex_seq_filtered.items():
                         #     filehandle.write("%s: %s\n" % (key, value))
                         for _, value in vertex_seq_filtered.items():
-                            filehandle.write("%s: %s\n" % (
-                                value[0][3], SPACE.join(list(map(lambda list_entry: str(list_entry[2]), value)))))
+                            filehandle.write("%d %s: %s\n" % (curr_height, value[0][3], SPACE.join(list(map(lambda list_entry: str(list_entry[2]), value)))))
                 finally:
                     filehandle.close()
 
@@ -230,8 +230,8 @@ def new_test():
     Tree.add_edge(test_tree, Edge(16, 22, 4))
 
     # additional
-    Tree.add_node(test_tree, Node(20, lemma=14, sent_name=2))
-    Tree.add_node(test_tree, Node(21, lemma=9, sent_name=2))
+    Tree.add_node(test_tree, Node(20, lemma=14, sent_name=2, form=14))
+    Tree.add_node(test_tree, Node(21, lemma=9, sent_name=2, form=9))
 
     Tree.add_edge(test_tree, Edge(9, 20, 4))
     Tree.add_edge(test_tree, Edge(9, 21, 4))

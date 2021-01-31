@@ -217,19 +217,20 @@ def collect_equal_nodes(whole_tree, v_id, old_node_new_nodes, equal_nodes_mappin
     return equal_nodes
 
 
-def find_subtree_children(whole_tree, children, subtree, lemma_nodeid_dict, equal_nodes_mapping):
+def find_subtree_children(whole_tree, children, subtree, lemma_nodeid_dict):#, equal_nodes_mapping)
     subtree_children = []
     children_nodes = {}
     for subtree_node in subtree:
-        if subtree_node not in lemma_nodeid_dict.keys() or subtree_node in equal_nodes_mapping.keys():
-            if subtree_node in equal_nodes_mapping.keys():
-                target_child_list = list(set(lemma_nodeid_dict[equal_nodes_mapping[subtree_node]]) & children)
-                if len(target_child_list) > 0:
-                    target_child = target_child_list[0]
-                else:
-                    target_child = whole_tree.get_target_from_children(children_nodes, children, subtree_node)
-            else:
-                target_child = whole_tree.get_target_from_children(children_nodes, children, subtree_node)
+        if subtree_node not in lemma_nodeid_dict.keys():# or subtree_node in equal_nodes_mapping.keys():
+            target_child = whole_tree.get_target_from_children(children_nodes, children, subtree_node)
+            # if subtree_node in equal_nodes_mapping.keys():
+            #     target_child_list = list(set(lemma_nodeid_dict[equal_nodes_mapping[subtree_node]]) & children)
+            #     if len(target_child_list) > 0:
+            #         target_child = target_child_list[0]
+            #     else:
+            #         target_child = whole_tree.get_target_from_children(children_nodes, children, subtree_node)
+            # else:
+            #     target_child = whole_tree.get_target_from_children(children_nodes, children, subtree_node)
         else:
             intersection = set(lemma_nodeid_dict[subtree_node]) & children
             if len(intersection) == 0:
@@ -242,8 +243,7 @@ def find_subtree_children(whole_tree, children, subtree, lemma_nodeid_dict, equa
 
 def find_deep_subtree_children(whole_tree, subtree_children, classes_subtreeid_nodes_list):
     subtree_deep_children = set()
-    for subtree_lemma in list(
-            map(lambda x: whole_tree.get_node(x).lemma, subtree_children)):
+    for subtree_lemma in list(map(lambda x: whole_tree.get_node(x).lemma, subtree_children)):
         if subtree_lemma in classes_subtreeid_nodes_list.keys():
             subtree_deep_children.update(classes_subtreeid_nodes_list[subtree_lemma])
     subtree_deep_children.update(subtree_children)
@@ -251,7 +251,7 @@ def find_deep_subtree_children(whole_tree, subtree_children, classes_subtreeid_n
 
 
 def insert_node_in_tree(whole_tree, existing_node, id_count, subtree_new_label, subtree_label_sent,
-                        lemma_nodeid_dict, old_node_new_nodes, edge_to_curr, node_id):
+                        lemma_nodeid_dict, old_node_new_nodes, edge_to_curr, node_id, curr_height):
     # add a new node with a new lemma
     new_node = Tree.copy_node_details(existing_node, id_count)
     new_node.lemma = subtree_new_label
@@ -275,6 +275,7 @@ def insert_node_in_tree(whole_tree, existing_node, id_count, subtree_new_label, 
         lemma_nodeid_dict[parent_subtree_text] = {new_node.id}
     else:
         lemma_nodeid_dict[parent_subtree_text].add(new_node.id)
+    whole_tree.heights[new_node.id] = [curr_height]
     return new_node
 
 
@@ -315,7 +316,7 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
     subtree_label_sent = {}
     k_2 = {}  # identifiers of edges of subtrees
     lemma_nodeid_dict = {}
-    saved_combinations = []
+    # saved_combinations = []
     id_count = sorted([node.id for node in whole_tree.nodes], reverse=True)[0] + 1
     for nodes in grouped_heights:
         curr_height = nodes[0]
@@ -367,38 +368,37 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
                     for subtree in node_subtrees:
                         subtree_text = str_sequence_help_reversed.get(tuple(subtree))
                         subtree_new_label = unique_subtrees_mapped_global_subtree_lemma.get(str(lemma) + subtree_text)
-                        if subtree_new_label not in subtree_label_sent.keys() or existing_node.sent_name not in \
-                                subtree_label_sent[subtree_new_label]:
+                        if subtree_new_label not in subtree_label_sent.keys() or existing_node.sent_name not in subtree_label_sent[subtree_new_label]:
                             # create a new node for a subtree
                             new_node = insert_node_in_tree(whole_tree, existing_node, id_count, subtree_new_label,
                                                            subtree_label_sent,
-                                                           lemma_nodeid_dict, old_node_new_nodes, edge_to_curr, node_id)
+                                                           lemma_nodeid_dict, old_node_new_nodes, edge_to_curr, node_id, curr_height)
                             id_count += 1
-                            subtree_children = find_subtree_children(whole_tree, children, subtree, lemma_nodeid_dict,
-                                                                     equal_nodes_mapping)
+                            subtree_children = find_subtree_children(whole_tree, children, subtree, lemma_nodeid_dict)#,
+                                                                     # equal_nodes_mapping)
                             if len(subtree_children) > 0:
-                                general_comb = EMPTY_STR.join(sorted(
-                                    [str(whole_tree.global_similar_mapping[child_id]) for child_id in
-                                     subtree_children]))
-                                if general_comb not in saved_combinations:
-                                    # add edges to subtree's children from new node
-                                    Tree.add_new_edges(whole_tree, new_node.id, subtree_children)
-                                    # assign class
-                                    if subtree_new_label not in classes_subtreeid_nodes.keys():
-                                        classes_subtreeid_nodes[subtree_new_label] = [new_node.id]
-                                    else:
-                                        classes_subtreeid_nodes[subtree_new_label].append(new_node.id)
-                                    subtree_deep_children = find_deep_subtree_children(whole_tree, subtree_children,
-                                                                                       classes_subtreeid_nodes_list)
-                                    only_active = subtree_deep_children - whole_tree.inactive
-                                    if len(only_active) == 0:
-                                        only_active.update(subtree_children)
-                                    if subtree_new_label not in classes_subtreeid_nodes_list.keys():
-                                        classes_subtreeid_nodes_list[subtree_new_label] = only_active
-                                    else:
-                                        classes_subtreeid_nodes_list[subtree_new_label].update(only_active)
-                                    classes_subtreeid_nodes_list[subtree_new_label].add(new_node.id)
-                                    saved_combinations.append(general_comb)
+                                # general_comb = EMPTY_STR.join(sorted(
+                                #     [str(whole_tree.global_similar_mapping[child_id]) for child_id in
+                                #      subtree_children]))
+                                # if general_comb not in saved_combinations:
+                                # add edges to subtree's children from new node
+                                Tree.add_new_edges(whole_tree, new_node.id, subtree_children)
+                                # assign class
+                                if subtree_new_label not in classes_subtreeid_nodes.keys():
+                                    classes_subtreeid_nodes[subtree_new_label] = [new_node.id]
+                                else:
+                                    classes_subtreeid_nodes[subtree_new_label].append(new_node.id)
+                                subtree_deep_children = find_deep_subtree_children(whole_tree, subtree_children,
+                                                                                   classes_subtreeid_nodes_list)
+                                only_active = subtree_deep_children - whole_tree.inactive
+                                if len(only_active) == 0:
+                                    only_active.update(subtree_children)
+                                if subtree_new_label not in classes_subtreeid_nodes_list.keys():
+                                    classes_subtreeid_nodes_list[subtree_new_label] = only_active
+                                else:
+                                    classes_subtreeid_nodes_list[subtree_new_label].update(only_active)
+                                classes_subtreeid_nodes_list[subtree_new_label].add(new_node.id)
+                                    # saved_combinations.append(general_comb)
                             # remove old node and edges to/from it
                             whole_tree.add_inactive(node_id)
         print(time.time() - start)
