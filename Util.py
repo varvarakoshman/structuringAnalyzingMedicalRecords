@@ -73,7 +73,7 @@ def write_in_file(classes_part, classes_part_list, whole_tree):
                         #     filehandle.write("%s: %s\n" % (key, value))
                         for _, value in vertex_seq_filtered.items():
                             filehandle.write("%s: %s\n" % (
-                            value[0][3], SPACE.join(list(map(lambda list_entry: list_entry[2], value)))))
+                                value[0][3], SPACE.join(list(map(lambda list_entry: list_entry[2], value)))))
                 finally:
                     filehandle.close()
 
@@ -238,4 +238,7 @@ def new_test():
 
     test_tree.additional_nodes = {20, 21}
     test_tree.similar_lemmas = {10: [20, 21]}
+
+    test_tree.global_similar_mapping = {20: 10, 21: 10, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, 10: 10,
+                                        11: 11, 12: 12, 13: 13, 14: 14, 15: 15, 16: 16, 17: 17, 18: 18, 19: 19, 22: 22}
     return test_tree

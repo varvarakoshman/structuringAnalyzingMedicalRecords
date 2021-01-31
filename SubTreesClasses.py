@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from Preprocessing import read_data, replace_time_constructions
 from Tree import Tree, Node, Edge
 from Constants import *
-from Util import create_needed_directories, merge_in_file, write_in_file
+from Util import create_needed_directories, merge_in_file, write_in_file, new_test
 from W2Vprocessing import load_trained_word2vec, train_word2vec
 
 
@@ -70,8 +70,8 @@ def construct_tree(trees_df_filtered, dict_lemmas, dict_rel):
 
 def add_children_to_parents(k_2, grouped_lemmas, whole_tree, curr_height, old_node_new_nodes):
     all_parents = set()
-    for k, v in grouped_lemmas.items():
-        for v_id in list(v):
+    for lem, v_ids in grouped_lemmas.items():
+        for v_id in list(v_ids):
             edge_to_curr = whole_tree.get_edge(v_id)
             whole_tree.get_node(v_id).is_included = True
             if edge_to_curr is not None:
@@ -83,7 +83,7 @@ def add_children_to_parents(k_2, grouped_lemmas, whole_tree, curr_height, old_no
                 if v_id in old_node_new_nodes.keys():
                     lemmas_to_visit = old_node_new_nodes[v_id]
                 else:
-                    lemmas_to_visit = [k]
+                    lemmas_to_visit = [lem]
                 if v_id in whole_tree.similar_lemmas.keys():
                     for node_id in whole_tree.similar_lemmas[v_id]:
                         lemmas_to_visit.append(whole_tree.get_node(node_id).lemma)
@@ -164,7 +164,7 @@ def get_strings_from_combinations(all_combinations, v_id, str_sequence_help, str
                 stat_dict[l] = 1
             if joined_label not in str_sequence_help.keys():
                 str_sequence_help[joined_label] = [combs.copy()]
-                str_sequence_help[joined_label].append(combs)
+                # str_sequence_help[joined_label].append(combs)
             if joined_label in str_sequence_help.keys():
                 new_local_duplicates[v_id] = combs
             all_combinations_str_joined.add(joined_label)
@@ -285,11 +285,11 @@ def insert_node_in_tree(whole_tree, existing_node, id_count, subtree_new_label, 
 
 
 def add_additional_child_nodes(additional_child_nodes, lemma_nodeid_dict):
-    for additional_child, child_id in additional_child_nodes.items():
-        if additional_child not in lemma_nodeid_dict.keys():
-            lemma_nodeid_dict[additional_child] = {child_id}
+    for additional_child_lemma, child_id in additional_child_nodes.items():
+        if additional_child_lemma not in lemma_nodeid_dict.keys():
+            lemma_nodeid_dict[additional_child_lemma] = {child_id}
         else:
-            lemma_nodeid_dict[additional_child].add(child_id)
+            lemma_nodeid_dict[additional_child_lemma].add(child_id)
 
 
 def add_grouped_lemmas_to_dict(whole_tree, grouped_lemmas, lemma_nodeid_dict):
@@ -330,8 +330,8 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
         start = time.time()
         id_lemma_dict = {node.id: node.lemma for node in nodes[1]}
         grouped_lemmas = defaultdict(list)
-        for key, value in id_lemma_dict.items():
-            grouped_lemmas[value].append(key)
+        for id, lemma in id_lemma_dict.items():
+            grouped_lemmas[lemma].append(id)
         all_parents = add_children_to_parents(k_2, grouped_lemmas, whole_tree, curr_height, old_node_new_nodes)
         additional_child_nodes = add_additional_children_to_parents(k_2, whole_tree, all_parents)
         add_additional_child_nodes(additional_child_nodes, lemma_nodeid_dict)
@@ -435,20 +435,20 @@ def main():
     # pick_new_sentences()
     # draw_histogram()
     start = time.time()
-    trees_full_df, trees_df_filtered, long_df = read_data()
-    replace_time_constructions(trees_df_filtered)
-    replace_time_constructions(trees_full_df)
-    replace_time_constructions(long_df)
-    print('Time on reading the data: ' + str(time.time() - start))
-    part_of_speech_node_id = dict(trees_full_df[['lemma', 'upostag']].groupby(['lemma', 'upostag']).groups.keys())
+    # trees_full_df, trees_df_filtered, long_df = read_data()
+    # replace_time_constructions(trees_df_filtered)
+    # replace_time_constructions(trees_full_df)
+    # replace_time_constructions(long_df)
+    # print('Time on reading the data: ' + str(time.time() - start))
+    # part_of_speech_node_id = dict(trees_full_df[['lemma', 'upostag']].groupby(['lemma', 'upostag']).groups.keys())
 
     # get all lemmas and create a dictionary to map to numbers
-    dict_lemmas = {lemma: [index] for index, lemma in enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
-    dict_lemmas_full = {lemma: [index] for index, lemma in
-                        enumerate(dict.fromkeys(trees_full_df['lemma'].to_list()), 1)}
-    dict_lemmas_rev = {index[0]: lemma for lemma, index in dict_lemmas_full.items()}
-    dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
-    dict_rel_rev = {v: k for k, v in dict_rel.items()}
+    # dict_lemmas = {lemma: [index] for index, lemma in enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
+    # dict_lemmas_full = {lemma: [index] for index, lemma in
+    #                     enumerate(dict.fromkeys(trees_full_df['lemma'].to_list()), 1)}
+    # dict_lemmas_rev = {index[0]: lemma for lemma, index in dict_lemmas_full.items()}
+    # dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
+    # dict_rel_rev = {v: k for k, v in dict_rel.items()}
 
     # dict_lemmas = {lemma: [index] for index, lemma in enumerate(dict.fromkeys(long_df['lemma'].to_list()), 1)}
     # dict_form_lemma = dict(zip(long_df['form'].to_list(), long_df['lemma'].to_list()))
@@ -457,21 +457,22 @@ def main():
     # dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(long_df['deprel'].to_list()))}
     # dict_rel_rev = {v: k for k, v in dict_rel.items()}
 
-    if RUN_WITH_W2V:
-        start = time.time()
-        if LOAD_TRAINED:
-            load_trained_word2vec(dict_lemmas_full, dict_lemmas, part_of_speech_node_id)
-        else:
-            train_word2vec(trees_full_df)
-            load_trained_word2vec(dict_lemmas_full, dict_lemmas, part_of_speech_node_id)
-        print('Time on word2vec: ' + str(time.time() - start))
+    # if RUN_WITH_W2V:
+    #     start = time.time()
+    #     if LOAD_TRAINED:
+    #         load_trained_word2vec(dict_lemmas_full, dict_lemmas, part_of_speech_node_id)
+    #     else:
+    #         train_word2vec(trees_full_df)
+    #         load_trained_word2vec(dict_lemmas_full, dict_lemmas, part_of_speech_node_id)
+    #     print('Time on word2vec: ' + str(time.time() - start))
 
-    start = time.time()
-    long_df = long_df[:1223]
-    whole_tree = construct_tree(trees_df_filtered, dict_lemmas, dict_rel)
+    # start = time.time()
+    # long_df = long_df[:1223]
+    # whole_tree = construct_tree(trees_df_filtered, dict_lemmas, dict_rel)
+    whole_tree = new_test()
     # whole_tree = construct_tree(long_df, dict_lemmas, dict_rel)
     # write_tree_in_table(whole_tree)
-    print('Time on constructing the tree: ' + str(time.time() - start))
+    # print('Time on constructing the tree: ' + str(time.time() - start))
 
     whole_tree.set_help_dict()
     # partition nodes by height
@@ -486,7 +487,7 @@ def main():
         for height in heights:
             grouped_heights[height].append(node_1)
     grouped_heights = sorted(grouped_heights.items(), key=lambda x: x[0])
-    dict_lemmas_size = max(set(map(lambda x: x.lemma, whole_tree.nodes)))
+    dict_lemmas_size = max(set(map(lambda x: x.lemma, whole_tree.nodes))) + 1
 
     # classes for partial repeats
     start = time.time()
