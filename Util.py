@@ -73,7 +73,7 @@ def write_in_file(classes_part, classes_part_list, whole_tree):
                         #     filehandle.write("%s: %s\n" % (key, value))
                         for _, value in vertex_seq_filtered.items():
                             filehandle.write("%s: %s\n" % (
-                                value[0][3], SPACE.join(list(map(lambda list_entry: list_entry[2], value)))))
+                                value[0][3], SPACE.join(list(map(lambda list_entry: str(list_entry[2]), value)))))
                 finally:
                     filehandle.close()
 
@@ -187,26 +187,26 @@ def new_test():
     # add root
     Tree.add_node(test_tree, root_node)
     # add test nodes
-    Tree.add_node(test_tree, Node(1, lemma=18))
-    Tree.add_node(test_tree, Node(2, lemma=20))
-    Tree.add_node(test_tree, Node(3, lemma=3))
-    Tree.add_node(test_tree, Node(4, lemma=19))
-    Tree.add_node(test_tree, Node(5, lemma=5))
-    Tree.add_node(test_tree, Node(6, lemma=6))
-    Tree.add_node(test_tree, Node(7, lemma=8))
-    Tree.add_node(test_tree, Node(8, lemma=18))
-    Tree.add_node(test_tree, Node(9, lemma=20))
-    Tree.add_node(test_tree, Node(10, lemma=3))
-    Tree.add_node(test_tree, Node(11, lemma=4))
-    Tree.add_node(test_tree, Node(12, lemma=7))
-    Tree.add_node(test_tree, Node(13, lemma=19))
-    Tree.add_node(test_tree, Node(14, lemma=2))
-    Tree.add_node(test_tree, Node(15, lemma=18))
-    Tree.add_node(test_tree, Node(16, lemma=20))
-    Tree.add_node(test_tree, Node(17, lemma=7))
-    Tree.add_node(test_tree, Node(18, lemma=19))
-    Tree.add_node(test_tree, Node(19, lemma=8))
-    Tree.add_node(test_tree, Node(22, lemma=14))
+    Tree.add_node(test_tree, Node(1, lemma=18, sent_name=1, form=18))
+    Tree.add_node(test_tree, Node(2, lemma=20, sent_name=1, form=20))
+    Tree.add_node(test_tree, Node(3, lemma=3, sent_name=1, form=3))
+    Tree.add_node(test_tree, Node(4, lemma=19, sent_name=1, form=19))
+    Tree.add_node(test_tree, Node(5, lemma=5, sent_name=1, form=5))
+    Tree.add_node(test_tree, Node(6, lemma=6, sent_name=1, form=6))
+    Tree.add_node(test_tree, Node(7, lemma=8, sent_name=1, form=8))
+    Tree.add_node(test_tree, Node(8, lemma=18, sent_name=2, form=18))
+    Tree.add_node(test_tree, Node(9, lemma=20, sent_name=2, form=20))
+    Tree.add_node(test_tree, Node(10, lemma=3, sent_name=2, form=3))
+    Tree.add_node(test_tree, Node(11, lemma=4, sent_name=2, form=4))
+    Tree.add_node(test_tree, Node(12, lemma=7, sent_name=2, form=7))
+    Tree.add_node(test_tree, Node(13, lemma=19, sent_name=2, form=19))
+    Tree.add_node(test_tree, Node(14, lemma=2, sent_name=2, form=2))
+    Tree.add_node(test_tree, Node(15, lemma=18, sent_name=3, form=18))
+    Tree.add_node(test_tree, Node(16, lemma=20, sent_name=3, form=20))
+    Tree.add_node(test_tree, Node(17, lemma=7, sent_name=3, form=7))
+    Tree.add_node(test_tree, Node(18, lemma=19, sent_name=3, form=19))
+    Tree.add_node(test_tree, Node(19, lemma=8, sent_name=3, form=8))
+    Tree.add_node(test_tree, Node(22, lemma=14, sent_name=3, form=14))
     # add test edges
     Tree.add_edge(test_tree, Edge(0, 1, 0))
     Tree.add_edge(test_tree, Edge(0, 8, 0))
@@ -230,8 +230,8 @@ def new_test():
     Tree.add_edge(test_tree, Edge(16, 22, 4))
 
     # additional
-    Tree.add_node(test_tree, Node(20, lemma=14))
-    Tree.add_node(test_tree, Node(21, lemma=9))
+    Tree.add_node(test_tree, Node(20, lemma=14, sent_name=2))
+    Tree.add_node(test_tree, Node(21, lemma=9, sent_name=2))
 
     Tree.add_edge(test_tree, Edge(9, 20, 4))
     Tree.add_edge(test_tree, Edge(9, 21, 4))

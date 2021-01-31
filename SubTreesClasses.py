@@ -158,7 +158,7 @@ def get_strings_from_combinations(all_combinations, v_id, str_sequence_help, str
             combs = [str(item) for item in sorted(tup)]
             joined_label = EMPTY_STR.join(combs)
             if joined_label not in str_sequence_help.keys():
-                str_sequence_help[joined_label] = [combs.copy(), combs]
+                str_sequence_help[joined_label] = [combs.copy()]
             if joined_label in str_sequence_help.keys():
                 new_local_duplicates[v_id] = combs
             all_combinations_str_joined.add(joined_label)
@@ -170,7 +170,7 @@ def get_nodeid_repeats(filtered_combination_ids, str_sequence_help, duplicate_co
     dict_nodeid_comb = {}
     for subtree_label, v_ids in filtered_combination_ids.items():
         for v_i in v_ids:
-            if len(str_sequence_help.get(subtree_label)) > 2:
+            if len(str_sequence_help.get(subtree_label)) > 1:
                 subtree_comb = duplicate_combs[v_i]
             else:
                 subtree_comb = str_sequence_help.get(subtree_label)[0]
@@ -402,8 +402,8 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
                             # remove old node and edges to/from it
                             whole_tree.add_inactive(node_id)
         print(time.time() - start)
-    classes_subtreeid_nodes = {k: v for k, v in classes_subtreeid_nodes.items() if
-                               len(v) > 1}  # TODO: why do len=1 entries even appear here??
+    # classes_subtreeid_nodes = {k: v for k, v in classes_subtreeid_nodes.items() if
+    #                            len(v) > 1}  # TODO: why do len=1 entries even appear here??
     return classes_subtreeid_nodes, classes_subtreeid_nodes_list
 
 
