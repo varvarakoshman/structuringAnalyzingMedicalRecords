@@ -62,20 +62,18 @@ def write_in_file(classes_part, classes_part_list, whole_tree):
         vertex_seq = {}
         for vertex in v:
             curr_height = max(whole_tree.heights[vertex])
-            vertex_seq[vertex] = whole_tree.simple_dfs(vertex, classes_part_list[k])
+            sequence = whole_tree.simple_dfs(vertex, classes_part_list[k])
+            vertex_seq[vertex] = sequence
             if len(vertex_seq.items()) > 0 and len(vertex_seq[list(vertex_seq)[0]]) > 1:
                 filename = RESULT_PATH + '/results_%s.txt' % (str(k))
-                try:
-                    with open(filename, 'w', encoding='utf-8') as filehandle:
-                        target_indices = {v[0][3]: k for k, v in vertex_seq.items()}.values()
-                        vertex_seq_filtered = {k: v for k, v in vertex_seq.items() if k in target_indices}
-                        # better print for testing
-                        # for key, value in vertex_seq_filtered.items():
-                        #     filehandle.write("%s: %s\n" % (key, value))
-                        for _, value in vertex_seq_filtered.items():
-                            filehandle.write("%d %s: %s\n" % (curr_height, value[0][3], SPACE.join(list(map(lambda list_entry: str(list_entry[2]), value)))))
-                finally:
-                    filehandle.close()
+                with open(filename, 'w', encoding='utf-8') as filehandle:
+                    # target_indices = {v[0][3]: k for k, v in vertex_seq.items()}.values()
+                    # vertex_seq_filtered = {k: v for k, v in vertex_seq.items() if k in target_indices}
+                    # better print for testing
+                    # for key, value in vertex_seq_filtered.items():
+                    #     filehandle.write("%d %s: %s\n" % (curr_height, key, value))
+                    for _, value in vertex_seq.items():
+                        filehandle.write("%d %s: %s\n" % (curr_height, value[0][3], SPACE.join(list(map(lambda list_entry: str(list_entry[2]), value)))))
 
 
 def draw_histogram():
@@ -232,6 +230,7 @@ def new_test():
     # additional
     Tree.add_node(test_tree, Node(20, lemma=14, sent_name=2, form=14))
     Tree.add_node(test_tree, Node(21, lemma=9, sent_name=2, form=9))
+    Tree.add_node(test_tree, Node(23, lemma=21, sent_name=2, form=21))
 
     Tree.add_edge(test_tree, Edge(9, 20, 4))
     Tree.add_edge(test_tree, Edge(9, 21, 4))
