@@ -361,6 +361,7 @@ def check_if_has_with_no_children(whole_tree, subtree_children):
 
 
 def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
+    init_labels = {}
     classes_similar_mapping = whole_tree.global_similar_mapping.copy()  # dict for linking initial subtrees with its similar copies
     classes_subtreeid_nodes = {}
     classes_subtreeid_nodes_list = {}
@@ -374,6 +375,8 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
     subtree_sent_dict = {}
     subtree_node_id_dict = {}
     subtree_node_id_children = {}  # 1st level children (node ids) for a root (node id) of a subtree
+    nonrepeating_subtrees = {}
+    deep_subtrees_set = set()
     # saved_combinations = []
     id_count = sorted([node.id for node in whole_tree.nodes], reverse=True)[0] + 1
     for nodes in grouped_heights:
@@ -460,6 +463,8 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
                         if not main_condition:
                             target_children_hashs = [subtree_node_id_children[n_id] for n_id in subtree_node_id_dict[subtree_new_label]]
                             help_condition = hash(tuple(subtree_children)) not in target_children_hashs
+                        if help_condition:
+                            yyydyhdy = []
                         if main_condition or help_condition:
                             # subtree_new_label = unique_subtrees_mapped_global_subtree_lemma.get(str(lemma) + subtree_text)
                             # if subtree_new_label not in subtree_label_sent.keys() or existing_node.sent_name not in subtree_label_sent[subtree_new_label]: #????
@@ -493,29 +498,44 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
                                 subtree_node_id_children[new_node.id] = [hash(tuple(subtree_children))]
                             else:
                                 subtree_node_id_children[new_node.id].append(hash(tuple(subtree_children)))
-                nonrepeating_subtrees = {}
+                # nonrepeating_subtrees = {}
                 for node_id, node_subtrees in dict_nodeid_comb.items():
                     for subtree in node_subtrees:
                         old_hash = hash(tuple(subtree))
                         composite_subtree_key = tuple([old_hash, node_id])
                         if composite_subtree_key in subtree_hash_node_id_dict.keys():  # ignore repeating nodes
                             new_id, subtree_new_label = subtree_hash_node_id_dict[composite_subtree_key]
+                            if subtree_new_label == 2514:
+                                yyyy = []
                             subtree_children = subtree_hash_subtree_children_dict[composite_subtree_key]
                             sentences = subtree_hash_sent_dict[old_hash]
                             if len(subtree_children) > 0:
                                 has_with_no_children = False
                                 if curr_height != 1:
                                     has_with_no_children = check_if_has_with_no_children(whole_tree, subtree_children)
+                                deep_subtrees = [subtree_child for subtree_child in subtree_children if whole_tree.get_node(subtree_child).lemma in classes_subtreeid_nodes.keys()]
+                                # len_deep_subtrees = tuple([len(classes_subtreeid_nodes_list[whole_tree.get_node(subtree_child).lemma]) for subtree_child in deep_subtrees])
+                                init_subtree_mapped = []
+                                for subtree_child in subtree_children:
+                                    if subtree_child not in deep_subtrees:
+                                        init_subtree_mapped.append(classes_similar_mapping[subtree_child])
+                                    else:
+                                        init_subtree_mapped.append(subtree_child)
                                 subtree_mapped = [whole_tree.global_similar_mapping[subtree_child] for subtree_child in
                                                   subtree_children]
-                                initial_label = tuple([classes_similar_mapping[subtree_child] for subtree_child in subtree_children])
+                                # initial_label = tuple([classes_similar_mapping[subtree_child] for subtree_child in subtree_children])
+                                initial_label = tuple(init_subtree_mapped)
                                 mapped_label = tuple(subtree_mapped)
+                                has_deep_subtrees = len(deep_subtrees)
                                 # classes_similar_mapping[initial_label] = mapped_label  # append not needed???
                                 if not has_with_no_children or (has_with_no_children and initial_label in nonrepeating_subtrees.keys() and len(nonrepeating_subtrees[initial_label] - sentences) != 0)\
-                                        or initial_label == mapped_label:
-                                    if mapped_label not in nonrepeating_subtrees.keys() or len(nonrepeating_subtrees[mapped_label] - sentences) != 0:
-                                        # if initial_label not in nonrepeating_subtrees.keys():
-                                        #     nonrepeating_subtrees[initial_label] = sentences
+                                        or initial_label == mapped_label:# or has_deep_subtrees:
+                                    if mapped_label not in nonrepeating_subtrees.keys() or len(nonrepeating_subtrees[mapped_label] - sentences) != 0\
+                                        or (has_deep_subtrees and tuple([initial_label, whole_tree.get_node(new_id).sent_name]) not in deep_subtrees_set):
+                                        if has_deep_subtrees:
+                                            deep_subtrees_set.add(tuple([initial_label, whole_tree.get_node(new_id).sent_name]))
+                                        if initial_label not in nonrepeating_subtrees.keys():
+                                            nonrepeating_subtrees[initial_label] = sentences
                                         if mapped_label not in nonrepeating_subtrees.keys():
                                             nonrepeating_subtrees[mapped_label] = sentences
 
@@ -540,13 +560,14 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
                                         else:
                                             classes_subtreeid_nodes_list[subtree_new_label].update(only_active)
                                         classes_subtreeid_nodes_list[subtree_new_label].add(new_id)
+                                        init_labels[new_id] = initial_label
                                         # saved_combinations.append(general_comb)
                      # mark current node as old
                     whole_tree.add_inactive(node_id)
         print(time.time() - start)
     # classes_subtreeid_nodes = {k: v for k, v in classes_subtreeid_nodes.items() if
     #                            len(v) > 1}  # TODO: why do len=1 entries even appear here??
-    return classes_subtreeid_nodes, classes_subtreeid_nodes_list
+    return classes_subtreeid_nodes, classes_subtreeid_nodes_list, init_labels
 
 
 def main():
@@ -614,7 +635,7 @@ def main():
 
     # classes for partial repeats
     start = time.time()
-    classes_part, classes_part_list = compute_part_subtrees(whole_tree, dict_lemmas_size, grouped_heights)
+    classes_part, classes_part_list, init_labels = compute_part_subtrees(whole_tree, dict_lemmas_size, grouped_heights)
     write_tree_in_table(whole_tree)
     print('Time on calculating partial repeats: ' + str(time.time() - start))
     write_in_file(classes_part, classes_part_list, whole_tree)

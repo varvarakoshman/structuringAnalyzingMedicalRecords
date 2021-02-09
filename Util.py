@@ -73,7 +73,7 @@ def write_in_file(classes_part, classes_part_list, whole_tree):
                     # for key, value in vertex_seq_filtered.items():
                     #     filehandle.write("%d %s: %s\n" % (curr_height, key, value))
                     for _, value in vertex_seq.items():
-                        filehandle.write("%d %s: %s\n" % (curr_height, value[0][3], SPACE.join(list(map(lambda list_entry: str(list_entry[2]), value)))))
+                        filehandle.write("%d %s %s: %s\n" % (curr_height, value[0][1], value[0][3], SPACE.join(list(map(lambda list_entry: str(list_entry[2]), value)))))
 
 
 def draw_histogram():
