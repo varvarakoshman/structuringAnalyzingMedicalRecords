@@ -12,7 +12,7 @@ from Util import create_needed_directories, merge_in_file, write_in_file, new_te
 from W2Vprocessing import load_trained_word2vec, train_word2vec
 
 
-def construct_tree(trees_df_filtered, dict_lemmas, dict_rel):
+def construct_tree(trees_df_filtered, dict_lemmas, dict_rel, remapped_sent):
     # construct a tree with a list of edges and a list of nodes
     whole_tree = Tree()
     root_node = Node(0, 0)  # add root
@@ -34,7 +34,7 @@ def construct_tree(trees_df_filtered, dict_lemmas, dict_rel):
             main_id = temp_dict.get(row['id'])
             from_id = temp_dict.get(row['head'])
             weight = dict_rel.get(row['deprel'])
-            sent = row['sent_name']
+            sent = remapped_sent[row['sent_name']]
             form = row['form']
             # create main node
             curr_lemma = curr_lemmas[0]
@@ -524,19 +524,19 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
                                 subtree_mapped = [whole_tree.global_similar_mapping[subtree_child] for subtree_child in
                                                   subtree_children]
                                 # initial_label = tuple([classes_similar_mapping[subtree_child] for subtree_child in subtree_children])
-                                initial_label = tuple(init_subtree_mapped)
-                                mapped_label = tuple(subtree_mapped)
-                                has_deep_subtrees = len(deep_subtrees)
+                                initial_label = tuple(sorted(init_subtree_mapped))
+                                mapped_label = tuple(sorted(subtree_mapped))
+                                has_deep_subtrees = len(deep_subtrees) > 0
                                 # classes_similar_mapping[initial_label] = mapped_label  # append not needed???
                                 if not has_with_no_children or (has_with_no_children and initial_label in nonrepeating_subtrees.keys() and len(nonrepeating_subtrees[initial_label] - sentences) != 0)\
                                         or initial_label == mapped_label:# or has_deep_subtrees:
-                                    if mapped_label not in nonrepeating_subtrees.keys() or len(nonrepeating_subtrees[mapped_label] - sentences) != 0\
+                                    if (mapped_label not in nonrepeating_subtrees.keys() and not has_deep_subtrees) or (mapped_label in nonrepeating_subtrees.keys() and len(nonrepeating_subtrees[mapped_label] - sentences) != 0)\
                                         or (has_deep_subtrees and tuple([initial_label, whole_tree.get_node(new_id).sent_name]) not in deep_subtrees_set):
-                                        if has_deep_subtrees:
+                                        if has_deep_subtrees or curr_height == 1:
                                             deep_subtrees_set.add(tuple([initial_label, whole_tree.get_node(new_id).sent_name]))
-                                        if initial_label not in nonrepeating_subtrees.keys():
-                                            nonrepeating_subtrees[initial_label] = sentences
-                                        if mapped_label not in nonrepeating_subtrees.keys():
+                                            if initial_label not in nonrepeating_subtrees.keys():
+                                                nonrepeating_subtrees[initial_label] = sentences
+                                        elif mapped_label not in nonrepeating_subtrees.keys():
                                             nonrepeating_subtrees[mapped_label] = sentences
 
                                         # general_comb = EMPTY_STR.join(sorted(
@@ -552,7 +552,7 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
                                             classes_subtreeid_nodes[subtree_new_label].append(new_id)
                                         subtree_deep_children = find_deep_subtree_children(whole_tree, subtree_children,
                                                                                            classes_subtreeid_nodes_list)
-                                        only_active = subtree_deep_children - whole_tree.inactive
+                                        only_active = subtree_deep_children# - whole_tree.inactive
                                         if len(only_active) == 0:
                                             only_active.update(subtree_children)
                                         if subtree_new_label not in classes_subtreeid_nodes_list.keys():
@@ -592,6 +592,8 @@ def main():
     dict_lemmas_rev = {index[0]: lemma for lemma, index in dict_lemmas_full.items()}
     dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
     dict_rel_rev = {v: k for k, v in dict_rel.items()}
+    remapped_sent = {sent_name: index for index, sent_name in enumerate(dict.fromkeys(trees_full_df['sent_name'].to_list()), 1)}
+    remapped_sent_rev = {index: sent_name for sent_name, index in remapped_sent.items()}
 
     # dict_lemmas = {lemma: [index] for index, lemma in enumerate(dict.fromkeys(long_df['lemma'].to_list()), 1)}
     # dict_form_lemma = dict(zip(long_df['form'].to_list(), long_df['lemma'].to_list()))
@@ -612,7 +614,7 @@ def main():
     start = time.time()
     # long_df = long_df[:1223]
     # whole_tree = construct_tree(trees_df_filtered, dict_lemmas, dict_rel)
-    whole_tree = construct_tree(trees_df_filtered, dict_lemmas_full, dict_rel)
+    whole_tree = construct_tree(trees_df_filtered, dict_lemmas_full, dict_rel, remapped_sent)
     # whole_tree = new_test()
     # whole_tree = construct_tree(long_df, dict_lemmas, dict_rel)
     # write_tree_in_table(whole_tree)
@@ -638,7 +640,7 @@ def main():
     classes_part, classes_part_list, init_labels = compute_part_subtrees(whole_tree, dict_lemmas_size, grouped_heights)
     write_tree_in_table(whole_tree)
     print('Time on calculating partial repeats: ' + str(time.time() - start))
-    write_in_file(classes_part, classes_part_list, whole_tree)
+    write_in_file(classes_part, classes_part_list, whole_tree, remapped_sent_rev)
     merge_in_file()
     gg = []
 
