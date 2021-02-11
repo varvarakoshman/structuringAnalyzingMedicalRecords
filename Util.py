@@ -7,6 +7,8 @@ import os
 
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
+
 from Constants import *
 from Tree import Tree, Node, Edge
 
@@ -129,23 +131,23 @@ def write_in_file(classes_part, classes_part_list, whole_tree, remapped_sent_rev
     return classes_words
 
 
-def write_tree_in_table(whole_tree, dict_rel_rev, labels):
-    source_1 = 'medicalTextTrees/gephi_edges_import_word2vec.csv'
-    source_2 = 'medicalTextTrees/gephi_nodes_import_word2vec.csv'
-    with open(source_1, "w", newline='', encoding='utf-8') as csv_file_1, open(
-            source_2, "w", newline='', encoding='utf-8') as csv_file_2:
-        writer_1 = csv.writer(csv_file_1, delimiter=',')
-        writer_2 = csv.writer(csv_file_2, delimiter=',')
-        writer_1.writerow(['Source', 'Target', 'Weight'])
-        writer_2.writerow(['Id', 'Label', 'Class', 'Class_Label'])
-        included_nodes = list(filter(lambda x: x.res_class is not None, whole_tree.nodes))
-        included_ids = [node.id for node in included_nodes]
-        for edge in whole_tree.edges:
-            if edge.node_to in included_ids and edge.node_from in included_ids:
-                writer_1.writerow([edge.node_from, edge.node_to, dict_rel_rev[edge.weight]])
-        for node in included_nodes:
-            writer_2.writerow(
-                [node.id, (node.lemma, node.form, node.sent_name), node.res_class, labels[node.res_class]])
+# def write_tree_in_table(whole_tree, dict_rel_rev, labels):
+#     source_1 = 'medicalTextTrees/gephi_edges_import_word2vec.csv'
+#     source_2 = 'medicalTextTrees/gephi_nodes_import_word2vec.csv'
+#     with open(source_1, "w", newline='', encoding='utf-8') as csv_file_1, open(
+#             source_2, "w", newline='', encoding='utf-8') as csv_file_2:
+#         writer_1 = csv.writer(csv_file_1, delimiter=',')
+#         writer_2 = csv.writer(csv_file_2, delimiter=',')
+#         writer_1.writerow(['Source', 'Target', 'Weight'])
+#         writer_2.writerow(['Id', 'Label', 'Class', 'Class_Label'])
+#         included_nodes = list(filter(lambda x: x.res_class is not None, whole_tree.nodes))
+#         included_ids = [node.id for node in included_nodes]
+#         for edge in whole_tree.edges:
+#             if edge.node_to in included_ids and edge.node_from in included_ids:
+#                 writer_1.writerow([edge.node_from, edge.node_to, dict_rel_rev[edge.weight]])
+#         for node in included_nodes:
+#             writer_2.writerow(
+#                 [node.id, (node.lemma, node.form, node.sent_name), node.res_class, labels[node.res_class]])
 
 
 def draw_histogram():
