@@ -1,8 +1,8 @@
+from Constants import *
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # vim:fileencoding=utf-8
 
-from Constants import *
 import os
 import pandas as pd
 import shutil
@@ -31,7 +31,6 @@ def read_data():
     full_df = []
     stable_df = []
     long_df = []
-    c = 0
     for file in files:
         full_dir = os.path.join(DATA_PATH, file)
         name = file.split('.')[0]
@@ -51,8 +50,7 @@ def read_data():
             else:
                 this_df['sent_name'] = name
                 # stable_df.append(this_df)           # for strong equality
-                if this_df_filtered.shape[0] < 25:  # for word2vec
-                    c += 1
+                if this_df_filtered.shape[0] < 23:         # for word2vec
                     stable_df.append(this_df)
                 else:
                     long_df.append(this_df)
@@ -87,16 +85,20 @@ def read_data():
     replaced_numbers = [k for k, v in trees_full_df.lemma.str.contains('#').to_dict().items() if
                         v == True]
     for num in replaced_numbers:
-        trees_df_filtered.loc[num, 'upostag'] = 'Num'
         trees_full_df.loc[num, 'upostag'] = 'Num'
 
-    # target_sents = list({'40547_61', '37462_126', '40547_41', '37462_41', '37462_106', '38897_1', '48813_3_1',
-    #                      '48690_1_1', '32452_1', '31635_0_1', '43772_1_1', '40547_12', '37462_77', '37462_12'})  # TEST
-    # target_sents = list({'32867_6', '57809_7', '57126_7'})  # TEST
+    replaced_numbers = [k for k, v in trees_df_filtered.lemma.str.contains('#').to_dict().items() if
+                        v == True]
+    for num in replaced_numbers:
+        trees_df_filtered.loc[num, 'upostag'] = 'Num'
+
+    # target_sents = list({'44112_8', '38674_5', '55654_2', '35628_5'})
+    # target_sents = list({'44112_8', '38674_5', '55654_2', '35628_5', '32867_6', '57809_7', '57126_7'})  # TEST
+    target_sents = list({'57809_7', '57126_7'})  # TEST
     # target_sents = list({'55338_41', '58401_7'})  # TEST
-    # target_sents = list({'32191_2', '58282_3', '55066_0', '46855_3', '48408_0', '37676_3',
-    #                      '32191_0', '56109_5', '56661_0', '54743_1'}) # TEST
-    # trees_df_filtered = trees_df_filtered.loc[trees_df_filtered.sent_name.isin(target_sents)]  # TEST
+    # target_sents = list({'32191_2', '58282_3', '55066_0', '46855_3', '48408_0', '37676_3', '32191_0', '56109_5', '56661_0', '54743_1'}) # TEST
+    # target_sents = list({'32191_2', '58282_3', '55066_0', '46855_3', '48408_0'})
+    trees_df_filtered = trees_df_filtered.loc[trees_df_filtered.sent_name.isin(target_sents)]  # TEST
     # trees_full_df.loc[trees_full_df.index.isin(replaced_numbers)].assign(upostag = 'N')
 
     return trees_full_df, trees_df_filtered, long_df_filtered

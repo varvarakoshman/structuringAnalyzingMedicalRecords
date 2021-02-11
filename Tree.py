@@ -33,20 +33,23 @@ class Tree:
         self.additional_nodes = set()
         self.similar_lemmas = {}
         self.global_similar_mapping = {}
+        self.dict_lemmas = {}
+        self.dict_lemmas_rev = []
 
     @staticmethod
     def copy_node_details(existing_node, id_count):
         new_node = Node(id=id_count,
-                    form=existing_node.form,
-                    sent_name=existing_node.sent_name,
-                    is_included=existing_node.is_included)
+                        form=existing_node.form,
+                        sent_name=existing_node.sent_name,
+                        is_included=existing_node.is_included)
         return new_node
 
     def set_help_dict(self):
         self.edges_dict_from = {k: list(v) for k, v in itertools.groupby(sorted(self.edges, key=lambda x: x.node_from),
                                                                          key=lambda x: x.node_from)}
         self.nodes_dict_id = {node.id: node for node in self.nodes}
-        self.edges_dict_to = {k: list(v) for k, v in itertools.groupby(self.edges, key=lambda x: x.node_to)}
+        self.edges_dict_to = {k: list(v) for k, v in
+                              itertools.groupby(sorted(self.edges, key=lambda x: x.node_to), key=lambda x: x.node_to)}
 
     def add_node(self, node):
         self.nodes.append(node)
@@ -97,9 +100,8 @@ class Tree:
         self.inactive.add(node_id)
 
     def get_children_nodes(self, children):
-        children_nodes = {
-            str(Tree.get_edge(self, child)[0].weight) + str(Tree.get_node(self, child).lemma): child for
-            child in children}
+        children_nodes = {str(Tree.get_edge(self, child)[0].weight) + str(Tree.get_node(self, child).lemma): child for
+                          child in children}
         return children_nodes
 
     def create_new_node(self, new_id, lemma, form, sent, weight, from_id):
@@ -108,10 +110,25 @@ class Tree:
         new_edge = Edge(from_id, new_id, weight)
         Tree.add_edge(self, new_edge)
 
-    def get_target_from_children(self, children_nodes, children, subtree_node):
-        if len(children_nodes) == 0:
-            children_nodes = Tree.get_children_nodes(self, children)
-        return children_nodes[subtree_node]
+    # def get_target_from_children(self, children, subtree_node):
+    #     children_nodes = Tree.get_children_nodes(self, children)
+    #     # if len(children_nodes) == 0:
+    #     #     children_nodes = Tree.get_children_nodes(self, children)
+    #     try:
+    #         res = children_nodes[subtree_node]
+    #     except KeyError as ke:
+    #         fff = []
+    #     return res
+
+    def get_target_from_children(self, children, subtree_node):
+        children_nodes = Tree.get_children_nodes(self, children)
+        # if len(children_nodes) == 0:
+        #     children_nodes = Tree.get_children_nodes(self, children)
+        try:
+            res = children_nodes[subtree_node]
+        except KeyError as ke:
+            fff = []
+        return res
 
     def calculate_heights(self):
         visited = {node.id: False for node in self.nodes}

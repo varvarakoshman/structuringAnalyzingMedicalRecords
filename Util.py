@@ -5,10 +5,8 @@
 import csv
 import os
 
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-
+import matplotlib.pyplot as plt
 from Constants import *
 from Tree import Tree, Node, Edge
 
@@ -99,24 +97,25 @@ def merge_in_file():
 
 
 # POST-PROCESSING
-def write_in_file(classes_part, classes_part_list, whole_tree):
+def write_in_file(classes_part, classes_part_list, whole_tree, remapped_sent_rev):
     count = 0
     classes_words = {}
     for k, v in classes_part.items():
         vertex_seq = {}
         count += 1
         for vertex in v:
+            curr_height = max(whole_tree.heights[vertex])
             vertex_seq[vertex] = whole_tree.simple_dfs(vertex, classes_part_list[k])
             if len(vertex_seq.items()) > 0 and len(vertex_seq[list(vertex_seq)[0]]) > 1:
                 filename = RESULT_PATH + '/results_%s.txt' % (str(k))
                 try:
                     with open(filename, 'w', encoding='utf-8') as filehandle:
-                        target_indices = {v[0][3]: k for k, v in vertex_seq.items()}.values()
-                        vertex_seq_filtered = {k: v for k, v in vertex_seq.items() if k in target_indices}
+                        # target_indices = {v[0][3]: k for k, v in vertex_seq.items()}.values()
+                        # vertex_seq_filtered = {k: v for k, v in vertex_seq.items() if k in target_indices}
                         # better print for testing
                         # for key, value in vertex_seq_filtered.items():
                         #     filehandle.write("%s: %s\n" % (key, value))
-                        for _, value in vertex_seq_filtered.items():
+                        for _, value in vertex_seq.items():
                             for val in value:
                                 node = whole_tree.get_node(val[0])
                                 if node.res_class is None:
@@ -124,8 +123,7 @@ def write_in_file(classes_part, classes_part_list, whole_tree):
                             words = list(map(lambda list_entry: list_entry[2], value))
                             if count not in classes_words.keys():
                                 classes_words[count] = words
-                            filehandle.write("%s: %s\n" % (
-                                value[0][3], SPACE.join(words)))
+                            filehandle.write("%d %s %s: %s\n" % (curr_height, value[0][1], remapped_sent_rev[value[0][3]], SPACE.join(list(map(lambda list_entry: str(list_entry[2]), value)))))
                 finally:
                     filehandle.close()
     return classes_words
@@ -259,26 +257,26 @@ def new_test():
     # add root
     Tree.add_node(test_tree, root_node)
     # add test nodes
-    Tree.add_node(test_tree, Node(1, lemma=18))
-    Tree.add_node(test_tree, Node(2, lemma=20))
-    Tree.add_node(test_tree, Node(3, lemma=3))
-    Tree.add_node(test_tree, Node(4, lemma=19))
-    Tree.add_node(test_tree, Node(5, lemma=5))
-    Tree.add_node(test_tree, Node(6, lemma=6))
-    Tree.add_node(test_tree, Node(7, lemma=8))
-    Tree.add_node(test_tree, Node(8, lemma=18))
-    Tree.add_node(test_tree, Node(9, lemma=20))
-    Tree.add_node(test_tree, Node(10, lemma=3))
-    Tree.add_node(test_tree, Node(11, lemma=4))
-    Tree.add_node(test_tree, Node(12, lemma=7))
-    Tree.add_node(test_tree, Node(13, lemma=19))
-    Tree.add_node(test_tree, Node(14, lemma=2))
-    Tree.add_node(test_tree, Node(15, lemma=18))
-    Tree.add_node(test_tree, Node(16, lemma=20))
-    Tree.add_node(test_tree, Node(17, lemma=7))
-    Tree.add_node(test_tree, Node(18, lemma=19))
-    Tree.add_node(test_tree, Node(19, lemma=8))
-    Tree.add_node(test_tree, Node(22, lemma=14))
+    Tree.add_node(test_tree, Node(1, lemma=18, sent_name=1, form=18))
+    Tree.add_node(test_tree, Node(2, lemma=20, sent_name=1, form=20))
+    Tree.add_node(test_tree, Node(3, lemma=3, sent_name=1, form=3))
+    Tree.add_node(test_tree, Node(4, lemma=19, sent_name=1, form=19))
+    Tree.add_node(test_tree, Node(5, lemma=5, sent_name=1, form=5))
+    Tree.add_node(test_tree, Node(6, lemma=6, sent_name=1, form=6))
+    Tree.add_node(test_tree, Node(7, lemma=8, sent_name=1, form=8))
+    Tree.add_node(test_tree, Node(8, lemma=18, sent_name=2, form=18))
+    Tree.add_node(test_tree, Node(9, lemma=20, sent_name=2, form=20))
+    Tree.add_node(test_tree, Node(10, lemma=3, sent_name=2, form=3))
+    Tree.add_node(test_tree, Node(11, lemma=4, sent_name=2, form=4))
+    Tree.add_node(test_tree, Node(12, lemma=7, sent_name=2, form=7))
+    Tree.add_node(test_tree, Node(13, lemma=19, sent_name=2, form=19))
+    Tree.add_node(test_tree, Node(14, lemma=2, sent_name=2, form=2))
+    Tree.add_node(test_tree, Node(15, lemma=18, sent_name=3, form=18))
+    Tree.add_node(test_tree, Node(16, lemma=20, sent_name=3, form=20))
+    Tree.add_node(test_tree, Node(17, lemma=7, sent_name=3, form=7))
+    Tree.add_node(test_tree, Node(18, lemma=19, sent_name=3, form=19))
+    Tree.add_node(test_tree, Node(19, lemma=8, sent_name=3, form=8))
+    Tree.add_node(test_tree, Node(22, lemma=14, sent_name=3, form=14))
     # add test edges
     Tree.add_edge(test_tree, Edge(0, 1, 0))
     Tree.add_edge(test_tree, Edge(0, 8, 0))
@@ -302,12 +300,16 @@ def new_test():
     Tree.add_edge(test_tree, Edge(16, 22, 4))
 
     # additional
-    Tree.add_node(test_tree, Node(20, lemma=14))
-    Tree.add_node(test_tree, Node(21, lemma=9))
+    Tree.add_node(test_tree, Node(20, lemma=14, sent_name=2, form=14))
+    Tree.add_node(test_tree, Node(21, lemma=9, sent_name=2, form=9))
+    Tree.add_node(test_tree, Node(23, lemma=21, sent_name=2, form=21))
 
     Tree.add_edge(test_tree, Edge(9, 20, 4))
     Tree.add_edge(test_tree, Edge(9, 21, 4))
 
     test_tree.additional_nodes = {20, 21}
     test_tree.similar_lemmas = {10: [20, 21]}
+
+    test_tree.global_similar_mapping = {20: 10, 21: 10, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, 10: 10,
+                                        11: 11, 12: 12, 13: 13, 14: 14, 15: 15, 16: 16, 17: 17, 18: 18, 19: 19, 22: 22}
     return test_tree
