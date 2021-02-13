@@ -125,7 +125,7 @@ def write_in_file(classes_part, classes_part_list, whole_tree, remapped_sent_rev
                             words = list(map(lambda list_entry: list_entry[2], value))
                             if count not in classes_words.keys():
                                 classes_words[count] = words
-                            filehandle.write("%d %s %s: %s\n" % (curr_height, value[0][1], remapped_sent_rev[value[0][3]], SPACE.join(list(map(lambda list_entry: str(list_entry[2]), value)))))
+                            filehandle.write("%d %s %s: %s\n" % (curr_height, value, remapped_sent_rev[value[0][3]], SPACE.join(list(map(lambda list_entry: str(list_entry[2]), value)))))
                 finally:
                     filehandle.close()
     return classes_words
