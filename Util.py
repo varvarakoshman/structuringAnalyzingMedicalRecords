@@ -81,10 +81,11 @@ def label_classes(classes_words, dict_form_lemma):
 
 # POST-PROCESSING
 def merge_in_file():
-    files = sorted(os.listdir(RESULT_PATH))
+    files = os.listdir(RESULT_PATH)
+    files_sorted = sorted(files,key=lambda x: int(os.path.splitext(x)[0]))
     writer = open(MERGED_PATH, 'w', encoding='utf-8')
     try:
-        for file in files:
+        for file in files_sorted:
             full_dir = os.path.join(RESULT_PATH, file)
             try:
                 with open(full_dir, encoding='utf-8') as reader:
@@ -99,7 +100,7 @@ def merge_in_file():
 
 
 # POST-PROCESSING
-def write_in_file(classes_part, classes_part_list, whole_tree, remapped_sent_rev):
+def write_in_file(classes_part, classes_part_list, whole_tree, remapped_sent_rev, dict_rel_rev):
     count = 0
     classes_words = {}
     for k, v in classes_part.items():
@@ -109,7 +110,7 @@ def write_in_file(classes_part, classes_part_list, whole_tree, remapped_sent_rev
             curr_height = max(whole_tree.heights[vertex])
             vertex_seq[vertex] = whole_tree.simple_dfs(vertex, classes_part_list[k])
             if len(vertex_seq.items()) > 0 and len(vertex_seq[list(vertex_seq)[0]]) > 1:
-                filename = RESULT_PATH + '/results_%s.txt' % (str(k))
+                filename = RESULT_PATH + '/%s.txt' % (str(count))
                 try:
                     with open(filename, 'w', encoding='utf-8') as filehandle:
                         # target_indices = {v[0][3]: k for k, v in vertex_seq.items()}.values()
@@ -125,11 +126,11 @@ def write_in_file(classes_part, classes_part_list, whole_tree, remapped_sent_rev
                             words = list(map(lambda list_entry: list_entry[2], value))
                             if count not in classes_words.keys():
                                 classes_words[count] = words
-                            filehandle.write("%d %s %s: %s\n" % (curr_height, value, remapped_sent_rev[value[0][3]], SPACE.join(list(map(lambda list_entry: str(list_entry[2]), value)))))
+                            filehandle.write("len=%d h=%d sent=%s %s: %s\n" % (len(value), curr_height, value[0][1], remapped_sent_rev[value[0][3]],
+                                                                                   SPACE.join(SPACE.join(list(map(lambda list_entry: '(' + str(dict_rel_rev[list_entry[4]]) + ') ' + str(list_entry[2]), value))).split(' ')[1:])))
                 finally:
                     filehandle.close()
     return classes_words
-
 
 # def write_tree_in_table(whole_tree, dict_rel_rev, labels):
 #     source_1 = 'medicalTextTrees/gephi_edges_import_word2vec.csv'

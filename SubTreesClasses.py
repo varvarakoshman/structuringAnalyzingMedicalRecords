@@ -59,6 +59,7 @@ def construct_tree(trees_df_filtered, dict_lemmas, dict_rel, remapped_sent):
                         similar_lemmas_dict[main_id] = [new_id_count]
                     else:
                         similar_lemmas_dict[main_id].append(new_id_count)
+                    # whole_tree.heights[new_id_count] = whole_tree.heights[main_id]
                     global_similar_mapping[new_id_count] = main_id
                     children.append(new_id_count)
                     new_id_count += 1
@@ -168,10 +169,10 @@ def get_strings_from_combinations(all_combinations, str_sequence_help):  # , str
     # new_local_duplicates = {}
     for comb in all_combinations:
         for tup in comb:
-            combs = [str(item) for item in sorted(tup)]
+            combs = sorted(tup)
             hashcode_label = hash(tuple(combs))
             all_combinations_labels.add(hashcode_label)
-            if hashcode_label not in str_sequence_help.keys():
+            if hashcode_label not in str_sequence_help.keys() and len(set(combs)) == len(combs):  # 2nd condition is to filter out duplicates
                 str_sequence_help[hashcode_label] = [combs.copy()]
             # joined_label = EMPTY_STR.join(combs)
             # if joined_label not in str_sequence_help.keys():
@@ -243,7 +244,7 @@ def collect_equal_nodes(whole_tree, v_id, old_node_new_nodes, equal_nodes_mappin
                     merge.extend(merge_additional)
                 else:
                     merge = merge_additional.copy()
-                merge.insert(0, actual_label)
+            merge.insert(0, actual_label)
             if actual_label not in equal_nodes.keys():
                 equal_nodes[actual_label] = merge
             else:
@@ -251,14 +252,12 @@ def collect_equal_nodes(whole_tree, v_id, old_node_new_nodes, equal_nodes_mappin
     return equal_nodes
 
 
-def find_subtree_children(whole_tree, children, subtree, lemma_nodeid_dict):  # , equal_nodes_mapping)
+def find_subtree_children(whole_tree, classes_similar_mapping, children, subtree, lemma_nodeid_dict):  # , equal_nodes_mapping)
     subtree_children = []
     # children_nodes = {}
     for subtree_node in subtree:
-        if subtree_node == '12490':
-            uu = []
         if subtree_node not in lemma_nodeid_dict.keys():  # or subtree_node in equal_nodes_mapping.keys():
-            target_child = whole_tree.get_target_from_children(children, subtree_node)
+            target_child = [whole_tree.get_target_from_children(children, subtree_node)]
             # target_child = whole_tree.get_target_from_children(children_nodes, children, subtree_node)
             # if subtree_node in equal_nodes_mapping.keys():
             #     target_child_list = list(set(lemma_nodeid_dict[equal_nodes_mapping[subtree_node]]) & children)
@@ -272,22 +271,55 @@ def find_subtree_children(whole_tree, children, subtree, lemma_nodeid_dict):  # 
             equal_set = set(lemma_nodeid_dict[subtree_node])
             intersection = equal_set & children
             if len(intersection) != 0:
-                target_child = list(intersection)[0]
+                target_child = list(intersection)
+                # if len(target_child) > 1:
+                #     target_child_filtered = []
+                #     nonrepeating_main_nodes = []
+                #     for tc in target_child:
+                #         init_node_id = classes_similar_mapping[tc]
+                #         if init_node_id not in nonrepeating_main_nodes:
+                #             nonrepeating_main_nodes.append(init_node_id)
+                #             target_child_filtered.append(tc)
+                #     target_child = target_child_filtered
+                # target_child = list(intersection)[0]
             else:
                 children_nodes = whole_tree.get_children_nodes(children)
                 if subtree_node in children_nodes.keys():
-                    target_child = children_nodes[subtree_node]
+                    target_child = [children_nodes[subtree_node]]
                 else:
                     # union = equal_set.union(children)
                     children_nodes_2 = whole_tree.get_children_nodes(equal_set)
-                    target_child = children_nodes_2[subtree_node]
-
+                    target_child = [children_nodes_2[subtree_node]]
             # if len(intersection) == 0:
             #     target_child = whole_tree.get_target_from_children(children, subtree_node)
             #     # target_child = whole_tree.get_target_from_children(children_nodes, children, subtree_node)
             # else:
             #     target_child = list(intersection)[0]
-        subtree_children.append(target_child)
+        for target_ch in target_child: # there CAN be multiple target children
+            subtree_children.append(target_ch)
+    target_child_filtered = []
+    nonrepeating_main_nodes = []
+    for tc in subtree_children:
+        init_node_id = classes_similar_mapping[tc]
+        if init_node_id not in nonrepeating_main_nodes:
+            nonrepeating_main_nodes.append(init_node_id)
+            target_child_filtered.append(tc)
+    subtree_children = target_child_filtered
+    if len(subtree_children) > len(subtree):
+        lemma_ids_dict_local = {}
+        for subtree_child in subtree_children:
+            lemma = whole_tree.get_node(subtree_child).lemma
+            if lemma not in lemma_ids_dict_local.keys():
+                lemma_ids_dict_local[lemma] = [subtree_child]
+            else:
+                lemma_ids_dict_local[lemma].append(subtree_child)
+        valid_ids = list({k: v for k, v in lemma_ids_dict_local.items() if len(v) == 1}.values())
+        valid_ids_flatmapped = [valid_id for valid_list in valid_ids for valid_id in valid_list]
+        invalid_entries = {k: v for k, v in lemma_ids_dict_local.items() if len(v) > 1}
+        for _, ids in invalid_entries.items():
+            valid_id = set(ids) - whole_tree.additional_nodes
+            valid_ids_flatmapped.append(valid_id.pop())
+        subtree_children = valid_ids_flatmapped
     return subtree_children
 
 
@@ -387,9 +419,11 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
     subtree_node_id_dict = {}
     subtree_node_id_children = {}  # 1st level children (node ids) for a root (node id) of a subtree
     nonrepeating_subtrees = {}
-    deep_subtrees_set = set()
-    silly_check = []
+    classes_subtreeid_nodes_heights = {}
+    # deep_subtrees_set = set()
+    silly_check = {}
     subtree_hash_sent_dict = {}
+    len_combs = {}
     # saved_combinations = []
     id_count = sorted([node.id for node in whole_tree.nodes], reverse=True)[0] + 1
     for nodes in grouped_heights:
@@ -405,33 +439,25 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
         add_additional_child_nodes(additional_child_nodes, lemma_nodeid_dict)
         add_grouped_lemmas_to_dict(whole_tree, grouped_lemmas, lemma_nodeid_dict)
         if curr_height != 0:  # not applicable to leaves, leaves don't have subtrees
-            if curr_height == 3:
-                oo = []
-            # union_similar = [similar for k in grouped_lemmas.keys() for similar in whole_tree.dict_lemmas[k]]
-            # filtered_groups = {k: v for k, v in grouped_lemmas.items() if len(v) > 1 or (len([us for us in union_similar if us in whole_tree.dict_lemmas[k]]) > len(whole_tree.dict_lemmas[k]))}
+            if curr_height == 2:
+                ccc = []
             filtered_groups = {k: v for k, v in grouped_lemmas.items() if len(v) > 1}
             unique_groups = {k: v for k, v in grouped_lemmas.items() if len(v) == 1}
             unique_groups_keys_set = set(unique_groups.keys())
             unique_groups_keys_set_len = len(unique_groups_keys_set)
             additional_groups = {}
             for repeat_group_set in whole_tree.dict_lemmas_rev.copy():
-                if len(unique_groups_keys_set - repeat_group_set) == unique_groups_keys_set_len - len(repeat_group_set):
+                if len(repeat_group_set) != 0 and len(unique_groups_keys_set - repeat_group_set) == unique_groups_keys_set_len - len(repeat_group_set):
                     target_list = [unique_groups[repeat_lemma][0] for repeat_lemma in repeat_group_set]
                     additional_groups[repeat_group_set.pop()] = target_list
             filtered_groups_extended = {**filtered_groups, **additional_groups}
             for lemma, ids in filtered_groups_extended.items():
                 combination_ids = {}
                 str_sequence_help = {}
-                # str_sequence_help_reversed = {}
                 duplicate_combs = {}  # for several cases
                 # generate combinations
                 for v_id in ids:
                     equal_nodes = collect_equal_nodes(whole_tree, v_id, old_node_new_nodes, equal_nodes_mapping)
-                    # all_combinations_str_joined, new_local_duplicates = produce_combinations(k_2, v_id,
-                    #                                                                          str_sequence_help,
-                    #                                                                          str_sequence_help_reversed,
-                    #                                                                          equal_nodes,
-                    #                                                                          equal_nodes_mapping)
                     all_combinations_str_joined = produce_combinations(k_2, v_id, str_sequence_help, equal_nodes,
                                                                        equal_nodes_mapping)
                     for label in all_combinations_str_joined:
@@ -439,15 +465,10 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
                             combination_ids[label].append(v_id)
                         else:
                             combination_ids[label] = [v_id]
-                    # for id, comb_list in new_local_duplicates.items():
-                    #     duplicate_combs[id] = comb_list
-                    #     lemma_count = add_new_subtree_label(unique_subtrees_mapped_global_subtree_lemma, lemma,
-                    #                                         lemma_count,
-                    #                                         EMPTY_STR.join(comb_list))
                 filtered_combination_ids = {k: v for k, v in combination_ids.items() if len(v) > 1}
-                # subtree_hash_sent_dict = {}
                 for subtree_hash, v_ids in filtered_combination_ids.items():
                     for v_id in v_ids:
+                        # if v_id in whole_tree.created:
                         sent = whole_tree.get_node(v_id).sent_name
                         if subtree_hash not in subtree_hash_sent_dict.keys():
                             subtree_hash_sent_dict[subtree_hash] = {sent}
@@ -457,8 +478,9 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
                 subtree_hash_node_id_dict = {}
                 subtree_hash_subtree_children_dict = {}
                 for tree_label, node_list in filtered_combination_ids.items():
-                    lemma_count = add_new_subtree_label(unique_subtrees_mapped_global_subtree_lemma, lemma, lemma_count,
-                                                        tree_label, str_sequence_help)
+                    if tree_label in str_sequence_help.keys():
+                        lemma_count = add_new_subtree_label(unique_subtrees_mapped_global_subtree_lemma, lemma, lemma_count,
+                                                            tree_label, str_sequence_help)
                 dict_nodeid_comb = get_nodeid_repeats(filtered_combination_ids, str_sequence_help, duplicate_combs)
                 for node_id, node_subtrees in dict_nodeid_comb.items():
                     existing_node = whole_tree.get_node(node_id)
@@ -469,34 +491,30 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
                         # subtree_text = str_sequence_help_reversed.get(tuple(subtree))
                         new_hash = hash((str(lemma),) + tuple(str_sequence_help[old_hash][0]))
                         subtree_new_label = unique_subtrees_mapped_global_subtree_lemma[new_hash]
-                        subtree_children = find_subtree_children(whole_tree, children, subtree, lemma_nodeid_dict)  # ,
-                        # equal_nodes_mapping)
+                        subtree_children = find_subtree_children(whole_tree, classes_similar_mapping, children, subtree, lemma_nodeid_dict)  # equal_nodes_mapping)
                         main_condition = subtree_new_label not in subtree_sent_dict.keys() or existing_node.sent_name not in subtree_sent_dict[subtree_new_label]
                         help_condition = False
                         if not main_condition:
-                            target_children_hashs = [subtree_node_id_children[n_id] for n_id in subtree_node_id_dict[subtree_new_label]]
+                            target_children_hashs = [child_id for n_id in subtree_node_id_dict[subtree_new_label] for child_id in subtree_node_id_children[n_id]]
                             help_condition = hash(tuple(subtree_children)) not in target_children_hashs
                         if main_condition or help_condition:
-                            # subtree_new_label = unique_subtrees_mapped_global_subtree_lemma.get(str(lemma) + subtree_text)
-                            # if subtree_new_label not in subtree_label_sent.keys() or existing_node.sent_name not in subtree_label_sent[subtree_new_label]: #????
                             # create a new node for a subtree
                             new_node = insert_node_in_tree(whole_tree, existing_node, id_count, subtree_new_label,
                                                            subtree_label_sent,
                                                            lemma_nodeid_dict, old_node_new_nodes, edge_to_curr, node_id,
                                                            curr_height, classes_similar_mapping)
                             id_count += 1
-                            # subtree_children = find_subtree_children(whole_tree, children, subtree, lemma_nodeid_dict)  # ,
-                            # # equal_nodes_mapping)
                             composite_subtree_key = tuple([old_hash, node_id])
                             subtree_hash_subtree_children_dict[composite_subtree_key] = subtree_children
                             subtree_hash_node_id_dict[composite_subtree_key] = [new_node.id, new_node.lemma]
                             if len(subtree_children) > 0:
-                                sentences = subtree_hash_sent_dict[old_hash]
-                                for subtree_child in subtree_children:
-                                    if subtree_child not in node_id_sent_dict.keys():
-                                        node_id_sent_dict[subtree_child] = sentences
-                                    else:
-                                        node_id_sent_dict[subtree_child].update(sentences)
+                                if old_hash in subtree_hash_sent_dict.keys():
+                                    sentences = subtree_hash_sent_dict[old_hash]
+                                    for subtree_child in subtree_children:
+                                        if subtree_child not in node_id_sent_dict.keys():
+                                            node_id_sent_dict[subtree_child] = sentences
+                                        else:
+                                            node_id_sent_dict[subtree_child].update(sentences)
                             if subtree_new_label not in subtree_sent_dict.keys():
                                 subtree_sent_dict[subtree_new_label] = [existing_node.sent_name]
                             else:
@@ -509,21 +527,23 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
                                 subtree_node_id_children[new_node.id] = [hash(tuple(subtree_children))]
                             else:
                                 subtree_node_id_children[new_node.id].append(hash(tuple(subtree_children)))
-                # nonrepeating_subtrees = {}
                 for node_id, node_subtrees in dict_nodeid_comb.items():
                     for subtree in node_subtrees:
                         old_hash = hash(tuple(subtree))
                         composite_subtree_key = tuple([old_hash, node_id])
                         if composite_subtree_key in subtree_hash_node_id_dict.keys():  # ignore repeating nodes
                             new_id, subtree_new_label = subtree_hash_node_id_dict[composite_subtree_key]
+                            curr_sent = whole_tree.get_node(new_id).sent_name
                             subtree_children = subtree_hash_subtree_children_dict[composite_subtree_key]
-                            sentences = subtree_hash_sent_dict[old_hash]
+                            if old_hash in subtree_hash_sent_dict.keys():
+                                sentences = subtree_hash_sent_dict[old_hash]
+                            else:
+                                sentences = set()
                             if len(subtree_children) > 0:
                                 has_with_no_children = False
                                 if curr_height != 1:
                                     has_with_no_children = check_if_has_with_no_children(whole_tree, subtree_children)
                                 deep_subtrees = [subtree_child for subtree_child in subtree_children if whole_tree.get_node(subtree_child).lemma in classes_subtreeid_nodes.keys()]
-                                # len_deep_subtrees = tuple([len(classes_subtreeid_nodes_list[whole_tree.get_node(subtree_child).lemma]) for subtree_child in deep_subtrees])
                                 init_subtree_mapped = []
                                 for subtree_child in subtree_children:
                                     if subtree_child not in deep_subtrees:
@@ -532,60 +552,80 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
                                         init_subtree_mapped.append(subtree_child)
                                 subtree_mapped = [whole_tree.global_similar_mapping[subtree_child] for subtree_child in
                                                   subtree_children]
-                                # initial_label = tuple([classes_similar_mapping[subtree_child] for subtree_child in subtree_children])
                                 initial_label = tuple(sorted(init_subtree_mapped))
                                 mapped_label = tuple(sorted(subtree_mapped))
                                 has_deep_subtrees = len(deep_subtrees) > 0
                                 # classes_similar_mapping[initial_label] = mapped_label  # append not needed???
-                                if not has_with_no_children or (has_with_no_children and initial_label in nonrepeating_subtrees.keys() and len(nonrepeating_subtrees[initial_label] - sentences) != 0):
-                                        # or initial_label == mapped_label:# or has_deep_subtrees:
-                                    if (mapped_label not in nonrepeating_subtrees.keys() and not has_deep_subtrees) or (mapped_label in nonrepeating_subtrees.keys() and len(sentences - nonrepeating_subtrees[mapped_label]) != 0)\
-                                        or has_deep_subtrees and (initial_label not in nonrepeating_subtrees.keys() or initial_label in nonrepeating_subtrees.keys() and len(sentences - nonrepeating_subtrees[initial_label]) != 0):#tuple([initial_label, whole_tree.get_node(new_id).sent_name]) not in deep_subtrees_set):
-                                        if has_deep_subtrees or curr_height == 1:
-                                            # deep_subtrees_set.add(tuple([initial_label, whole_tree.get_node(new_id).sent_name]))
-                                            if initial_label not in nonrepeating_subtrees.keys():
-                                                nonrepeating_subtrees[initial_label] = sentences
-                                        elif mapped_label not in nonrepeating_subtrees.keys():
-                                            nonrepeating_subtrees[mapped_label] = sentences
+                                if not has_with_no_children or (has_with_no_children and initial_label in nonrepeating_subtrees.keys() and len(sentences) != 0 and len(sentences - nonrepeating_subtrees[initial_label]) != 0)\
+                                        or initial_label == mapped_label:# or has_deep_subtrees:
+                                    if (mapped_label not in nonrepeating_subtrees.keys() and not has_deep_subtrees) or\
+                                            (mapped_label in nonrepeating_subtrees.keys() and len(sentences - nonrepeating_subtrees[mapped_label]) != 0)\
+                                        or has_deep_subtrees and \
+                                            (initial_label not in nonrepeating_subtrees.keys()
+                                             or initial_label in nonrepeating_subtrees.keys() and len(sentences) != 0 and (len(sentences - nonrepeating_subtrees[initial_label]) != 0)):#tuple([initial_label, whole_tree.get_node(new_id).sent_name]) not in deep_subtrees_set):
 
-                                        # general_comb = EMPTY_STR.join(sorted(
-                                        #     [str(whole_tree.global_similar_mapping[child_id]) for child_id in
-                                        #      subtree_children]))
-                                        # if general_comb not in saved_combinations:
-                                        # add edges to subtree's children from new node
-
-                                        Tree.add_new_edges(whole_tree, new_id, subtree_children)
-                                        # assign class
-                                        if subtree_new_label not in classes_subtreeid_nodes.keys():
-                                            classes_subtreeid_nodes[subtree_new_label] = [new_id]
-                                        else:
-                                            classes_subtreeid_nodes[subtree_new_label].append(new_id)
                                         subtree_deep_children = find_deep_subtree_children(whole_tree, subtree_children,
                                                                                            classes_subtreeid_nodes_list)
-                                        only_active = subtree_deep_children #- whole_tree.inactive
+                                        # only_active = set(subtree_deep_children) #- whole_tree.inactive
+                                        # only_active = set([node.id for node in whole_tree.nodes if node.id in subtree_deep_children and node.sent_name == curr_sent])
+                                        only_active = set()
+                                        for node in subtree_deep_children:
+                                            if whole_tree.get_node(node).sent_name == curr_sent:
+                                                only_active.add(node)
+                                        nonrepeating = []
+                                        only_active_filtered = []
+                                        # if len(only_active) != 0:
+                                        #     active_heights = {active_id: whole_tree.heights[active_id] for active_id in only_active}
+                                        #     max_height = max(active_heights.values())
+                                        #     ids_with_max_height = {k: v for k, v in active_heights.items() if v == max_height}
+                                        #     for root_subtree_id, height in ids_with_max_height.items():
+                                        #         if node_id not in list(map(lambda x: x.node_from, whole_tree.get_edge(root_subtree_id))):
+                                        #             children_to_remove = whole_tree.dfs_subtree(root_subtree_id, only_active)
+                                        #             only_active = only_active - set(children_to_remove)
+                                                    # only_active = filter_children(whole_tree, root_subtree_id, only_active)  # filter out children from the same sentence and equal subtrees, but in the different positions in a sentence
+                                        # v_ids_max_height = [for active_id in only_active]
+                                        for active in only_active:
+                                            if classes_similar_mapping[active] not in nonrepeating:# and node_id in list(map(lambda x: x.node_from, whole_tree.get_edge(active))):# and curr_height in whole_tree.heights[active]: # CHECK 2ND COND!!!
+                                                only_active_filtered.append(active)
+                                                nonrepeating.append(classes_similar_mapping[active])
+                                        initial_label_deep = tuple(sorted(
+                                            [classes_similar_mapping[subtree_child] for subtree_child in
+                                             only_active_filtered]))
+                                        if not has_deep_subtrees or (has_deep_subtrees and initial_label_deep not in nonrepeating_subtrees.keys()):
+                                            if has_deep_subtrees or curr_height == 1:
+                                                # deep_subtrees_set.add(tuple([initial_label, whole_tree.get_node(new_id).sent_name]))
+                                                nonrepeating_subtrees[initial_label_deep] = sentences #!!
+                                                if initial_label not in nonrepeating_subtrees.keys():
+                                                    nonrepeating_subtrees[initial_label] = sentences
+                                            elif mapped_label not in nonrepeating_subtrees.keys():
+                                                nonrepeating_subtrees[mapped_label] = sentences
 
-                                        plain_forms = [whole_tree.get_node(subtree_child).form for subtree_child in only_active]
-                                        plain_forms.append(whole_tree.get_node(new_id).form)
-                                        temp = tuple([tuple(plain_forms), whole_tree.get_node(new_id).sent_name])
-                                        if temp in silly_check:
-                                            aaaaaaaa = []
-                                        silly_check.append(temp)
+                                            Tree.add_new_edges(whole_tree, new_id, subtree_children)
+                                            # assign class
+                                            if subtree_new_label not in classes_subtreeid_nodes.keys():
+                                                classes_subtreeid_nodes[subtree_new_label] = [new_id]
+                                            else:
+                                                classes_subtreeid_nodes[subtree_new_label].append(new_id)
 
-                                        if len(only_active) == 0:
-                                            only_active.update(subtree_children)
-                                        if subtree_new_label not in classes_subtreeid_nodes_list.keys():
-                                            classes_subtreeid_nodes_list[subtree_new_label] = only_active
-                                        else:
-                                            classes_subtreeid_nodes_list[subtree_new_label].update(only_active)
-                                        classes_subtreeid_nodes_list[subtree_new_label].add(new_id)
-                                        init_labels[new_id] = initial_label
-                                        # saved_combinations.append(general_comb)
+                                            if len(only_active_filtered) == 0:
+                                                only_active_filtered = subtree_children
+                                            if subtree_new_label not in classes_subtreeid_nodes_list.keys():
+                                                classes_subtreeid_nodes_list[subtree_new_label] = set(only_active_filtered)
+                                            else:
+                                                classes_subtreeid_nodes_list[subtree_new_label].update(only_active_filtered)
+                                            if subtree_new_label not in classes_subtreeid_nodes_heights.keys():
+                                                classes_subtreeid_nodes_heights[subtree_new_label] = curr_height
+                                            classes_subtreeid_nodes_list[subtree_new_label].add(new_id)
+                                            init_labels[new_id] = initial_label
+                                            # saved_combinations.append(general_comb)
                      # mark current node as old
                     whole_tree.add_inactive(node_id)
         print(time.time() - start)
-    # classes_subtreeid_nodes = {k: v for k, v in classes_subtreeid_nodes.items() if
-    #                            len(v) > 1}  # TODO: why do len=1 entries even appear here??
-    return classes_subtreeid_nodes, classes_subtreeid_nodes_list, init_labels
+    classes_subtreeid_nodes_heights = dict(sorted(classes_subtreeid_nodes_heights.items(), key=lambda item: item[0]))
+    classes_subtreeid_nodes_sorted = {k: classes_subtreeid_nodes[k] for k in classes_subtreeid_nodes_heights.keys()}
+    classes_subtreeid_nodes_sorted = {k: v for k, v in classes_subtreeid_nodes_sorted.items() if
+                               len(v) > 1}  # TODO: why do len=1 entries even appear here??
+    return classes_subtreeid_nodes_sorted, classes_subtreeid_nodes_list, init_labels
 
 
 def main():
@@ -652,13 +692,16 @@ def main():
             grouped_heights[height].append(node_1)
     grouped_heights = sorted(grouped_heights.items(), key=lambda x: x[0])
     dict_lemmas_size = max(set(map(lambda x: x.lemma, whole_tree.nodes))) + 1
+    for node in whole_tree.nodes:
+        if node.id not in whole_tree.heights.keys():
+            whole_tree.heights[node.id] = whole_tree.heights[whole_tree.global_similar_mapping[node.id]]
 
     # classes for partial repeats
     start = time.time()
     classes_part, classes_part_list, init_labels = compute_part_subtrees(whole_tree, dict_lemmas_size, grouped_heights)
     write_tree_in_table(whole_tree)
     print('Time on calculating partial repeats: ' + str(time.time() - start))
-    write_in_file(classes_part, classes_part_list, whole_tree, remapped_sent_rev)
+    write_in_file(classes_part, classes_part_list, whole_tree, remapped_sent_rev, dict_rel_rev)
     merge_in_file()
     gg = []
 

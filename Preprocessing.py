@@ -55,8 +55,24 @@ def read_data():
                 else:
                     long_df.append(this_df)
                 full_df.append(this_df)
-
-    trees_df = pd.concat(stable_df, axis=0, ignore_index=True)
+    dfs_grouped_by = {}
+    for df in stable_df: # replace to full
+        sent_len = len(df)
+        if sent_len not in dfs_grouped_by.keys():
+            dfs_grouped_by[sent_len] = [df]
+        else:
+            dfs_grouped_by[sent_len].append(df)
+    dfs_filtered = []
+    for _, dfs in dfs_grouped_by.items():
+        if len(dfs) > 1:
+            sent_history = []
+            for df in dfs:
+                sent_words = ' '.join(list(df.form))
+                if sent_words not in sent_history:
+                    sent_history.append(sent_words)
+                    dfs_filtered.append(df)
+    # trees_df = pd.concat(stable_df, axis=0, ignore_index=True)
+    trees_df = pd.concat(dfs_filtered, axis=0, ignore_index=True)
     long_df = pd.concat(long_df, axis=0, ignore_index=True)
     # delete useless data
     trees_df = trees_df.drop(columns=['xpostag', 'feats'], axis=1)
@@ -93,15 +109,26 @@ def read_data():
         trees_df_filtered.loc[num, 'upostag'] = 'Num'
 
     # target_sents = list({'44112_8', '38674_5', '55654_2', '35628_5'})
-    # target_sents = list({'44112_8', '38674_5', '55654_2', '35628_5', '32867_6', '57809_7', '57126_7'})  # TEST
+    # target_sents = list({'44112_8', '55654_2', '32867_6', '57809_7'})  # TEST
     # target_sents = list({'55654_2', '35628_5', '32867_6', '57809_7', '57126_7'})  # TEST
-    # target_sents = list({'57809_7', '57126_7', '55654_2'})  # TEST
-    target_sents = list({'55338_41', '58401_7'})  # TEST
-    # target_sents = list({'32191_2', '58282_3', '55066_0', '46855_3', '48408_0', '37676_3', '32191_0', '56109_5', '56661_0', '54743_1'}) # TEST
+    # target_sents = list({'57809_7', '57126_7'})  # TEST
+    # target_sents = list({'55338_41', '58401_7'})  # TEST
+    # target_sents = list({'46855_3', '48408_0', '37676_3', '56109_5', '56661_0', '54743_1'}) # TEST !!!!trickyyyy
+    # target_sents = list({'48408_0', '37676_3', '32191_0', '56109_5', '56661_0', '54743_1'}) # TEST
+    # target_sents = list({'46855_3', '48408_0', '37676_3', '56661_0'})  # TEST !!!!!!!!
+    # target_sents = list({'46855_3', '37676_3', '54743_1'})  # TEST
+    # target_sents = list({'58282_3', '46855_3', '37676_3'}) # TEST
     # target_sents = list({'32191_2', '58282_3', '55066_0', '46855_3', '48408_0'})
-    trees_df_filtered = trees_df_filtered.loc[trees_df_filtered.sent_name.isin(target_sents)]  # TEST
+    # target_sents = list({'53718_0', '46007_0', '56109_2', '41184_0'}) # test for plain
+    # target_sents = list({'167529_9', '152369_9', '172030_9', '172030_23', '48408_0'}) # meeeeeess
+
+    # trees_df_filtered = trees_df_filtered.loc[trees_df_filtered.sent_name.isin(target_sents)]  # TEST
     # trees_full_df.loc[trees_full_df.index.isin(replaced_numbers)].assign(upostag = 'N')
 
+    # trees_df_filtered = trees_df_filtered.head(513)
+    # trees_df_filtered = trees_df_filtered.head(339)
+    # trees_df_filtered = trees_df_filtered.head(431)
+    # trees_df_filtered = trees_df_filtered.head(431)
     return trees_full_df, trees_df_filtered, long_df_filtered
 
 

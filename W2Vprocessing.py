@@ -41,7 +41,7 @@ def load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id): #dict_lemma
     similar_lemmas_dict_filtered = {}
     for k, v in similar_lemmas_dict.items():
         stable = set(list(dict.fromkeys(v))) - most_freq
-        similar_lemmas_dict_filtered[k] = list(stable)[:5]
+        similar_lemmas_dict_filtered[k] = list(stable)[:3]
     jjj = []
     # pprint.pprint(similar_lemmas_dict_filtered)
     for lemma, similar_lemmas in similar_lemmas_dict_filtered.items():
