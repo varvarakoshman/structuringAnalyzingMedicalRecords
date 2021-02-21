@@ -9,7 +9,6 @@ class Node:
         self.form = form
         self.sent_name = sent_name
         self.is_included = is_included
-        # self.is_active = is_active
         self.res_class = res_class
 
 
@@ -25,7 +24,6 @@ class Tree:
     def __init__(self):
         self.edges = []
         self.nodes = []
-        self.inactive = set()
         self.created = set()
         self.heights = {}
         self.edges_dict_from = {}
@@ -97,9 +95,6 @@ class Tree:
         self.created.add(node.id)
         self.nodes.append(node)
 
-    def add_inactive(self, node_id):
-        self.inactive.add(node_id)
-
     def get_children_nodes(self, children):
         children_nodes = {str(Tree.get_edge(self, child)[0].weight) + str(Tree.get_node(self, child).lemma): child for
                           child in children}
@@ -111,25 +106,9 @@ class Tree:
         new_edge = Edge(from_id, new_id, weight)
         Tree.add_edge(self, new_edge)
 
-    # def get_target_from_children(self, children, subtree_node):
-    #     children_nodes = Tree.get_children_nodes(self, children)
-    #     # if len(children_nodes) == 0:
-    #     #     children_nodes = Tree.get_children_nodes(self, children)
-    #     try:
-    #         res = children_nodes[subtree_node]
-    #     except KeyError as ke:
-    #         fff = []
-    #     return res
-
     def get_target_from_children(self, children, subtree_node):
         children_nodes = Tree.get_children_nodes(self, children)
-        # if len(children_nodes) == 0:
-        #     children_nodes = Tree.get_children_nodes(self, children)
-        try:
-            res = children_nodes[subtree_node]
-        except KeyError as ke:
-            fff = []
-        return res
+        return children_nodes[subtree_node]
 
     def calculate_heights(self):
         visited = {node.id: False for node in self.nodes}

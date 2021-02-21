@@ -113,11 +113,6 @@ def write_in_file(classes_part, classes_part_list, whole_tree, remapped_sent_rev
                 filename = RESULT_PATH + '/%s.txt' % (str(count))
                 try:
                     with open(filename, 'w', encoding='utf-8') as filehandle:
-                        # target_indices = {v[0][3]: k for k, v in vertex_seq.items()}.values()
-                        # vertex_seq_filtered = {k: v for k, v in vertex_seq.items() if k in target_indices}
-                        # better print for testing
-                        # for key, value in vertex_seq_filtered.items():
-                        #     filehandle.write("%s: %s\n" % (key, value))
                         for _, value in vertex_seq.items():
                             for val in value:
                                 node = whole_tree.get_node(val[0])
