@@ -16,7 +16,7 @@ VIS_PATH = "medicalTextTrees/merged_extended_visualize.txt"
 UPPER_BOUND_ADDITIONAL_DATA = 50000
 HIGH_COSINE_DIST = 0.8
 LOAD_TRAINED = True
-RUN_WITH_W2V = False
+RUN_WITH_W2V = True
 
 # Additional constants
 EMPTY_STR = ""

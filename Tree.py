@@ -9,6 +9,7 @@ class Node:
         self.form = form
         self.sent_name = sent_name
         self.is_included = is_included
+        # self.is_active = is_active
         self.res_class = res_class
 
 

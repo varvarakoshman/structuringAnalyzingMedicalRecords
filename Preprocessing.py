@@ -114,6 +114,7 @@ def read_data():
     # target_sents = list({'57809_7', '57126_7'})  # TEST
     # target_sents = list({'55338_41', '58401_7'})  # TEST
     # target_sents = list({'46855_3', '48408_0', '37676_3', '56109_5', '56661_0', '54743_1'}) # TEST !!!!trickyyyy
+    # target_sents = list({'37535_4', '31635_2', '39786_8'}) # TEST !!!!trickyyyy
     # target_sents = list({'48408_0', '37676_3', '32191_0', '56109_5', '56661_0', '54743_1'}) # TEST
     # target_sents = list({'46855_3', '48408_0', '37676_3', '56661_0'})  # TEST !!!!!!!!
     # target_sents = list({'46855_3', '37676_3', '54743_1'})  # TEST
@@ -122,12 +123,12 @@ def read_data():
     # target_sents = list({'53718_0', '46007_0', '56109_2', '41184_0'}) # test for plain
     # target_sents = list({'167529_9', '152369_9', '172030_9', '172030_23', '48408_0'}) # meeeeeess
 
-    # trees_df_filtered = trees_df_filtered.loc[trees_df_filtered.sent_name.isin(target_sents)]  # TEST
+    # trees_df_filtered = trees_full_df.loc[trees_full_df.sent_name.isin(target_sents)] # TEST
     # trees_full_df.loc[trees_full_df.index.isin(replaced_numbers)].assign(upostag = 'N')
 
     # trees_df_filtered = trees_df_filtered.head(513)
     # trees_df_filtered = trees_df_filtered.head(339)
-    # trees_df_filtered = trees_df_filtered.head(431)
+    # trees_df_filtered = trees_df_filtered.head(411)
     # trees_df_filtered = trees_df_filtered.head(431)
     return trees_full_df, trees_df_filtered, long_df_filtered
 
