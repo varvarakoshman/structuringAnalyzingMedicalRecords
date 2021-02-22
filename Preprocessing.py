@@ -50,7 +50,7 @@ def read_data():
             else:
                 this_df['sent_name'] = name
                 # stable_df.append(this_df)           # for strong equality
-                if this_df_filtered.shape[0] < 23:         # for word2vec
+                if this_df_filtered.shape[0] < 26:         # for word2vec
                     stable_df.append(this_df)
                 else:
                     long_df.append(this_df)
@@ -103,8 +103,7 @@ def read_data():
     for num in replaced_numbers:
         trees_full_df.loc[num, 'upostag'] = 'Num'
 
-    replaced_numbers = [k for k, v in trees_df_filtered.lemma.str.contains('#').to_dict().items() if
-                        v == True]
+    replaced_numbers = [k for k, v in trees_df_filtered.lemma.str.contains('#').to_dict().items() if v == True]
     for num in replaced_numbers:
         trees_df_filtered.loc[num, 'upostag'] = 'Num'
 
