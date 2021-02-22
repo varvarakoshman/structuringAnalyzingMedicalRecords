@@ -1,0 +1,5 @@
+EMPTY_STR = ""
+DATA_PATH = r"data/main_real"
+RESULT_PATH = "results_main"
+SPACE = " "
+MERGED_PATH = "medicalTextTrees/merged_extended.txt"

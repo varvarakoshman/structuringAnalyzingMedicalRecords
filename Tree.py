@@ -1,6 +1,4 @@
-import numpy as np
 from queue import LifoQueue
-import itertools
 
 
 class Node:
@@ -22,16 +20,7 @@ class Tree:
     def __init__(self):
         self.edges = []
         self.nodes = []
-        self.heights = []
-        self.edges_dict_from = {}
-        self.edges_dict_to = {}
-        self.nodes_dict_id = {}
-
-    def set_help_dict(self):
-        self.edges_dict_from = {k: list(v) for k, v in itertools.groupby(sorted(self.edges, key=lambda x: x.node_from),
-                                                                         key=lambda x: x.node_from)}
-        self.nodes_dict_id = {node.id: node for node in self.nodes}
-        self.edges_dict_to = {k: list(v)[0] for k, v in itertools.groupby(self.edges, key=lambda x: x.node_to)}
+        self.heights = {}
 
     def add_node(self, node):
         self.nodes.append(node)
@@ -40,22 +29,24 @@ class Tree:
         self.edges.append(edge)
 
     def get_node(self, node_id):
-        return self.nodes_dict_id.get(node_id)  # return Node class instance
+        return list(filter(lambda x: x.id == node_id, self.nodes))[0]  # return Node class instance
 
     def get_children(self, node_id):
-        edges = self.edges_dict_from.get(node_id)
-        return list(map(lambda x: x.node_to, edges if edges is not None else []))
+        return list(map(lambda x: x.node_to, filter(lambda x: x.node_from == node_id, self.edges)))
 
     def get_edge(self, to_id):
-        return self.edges_dict_to.get(to_id)
-
-    def remove_edge(self, to_id):
-        self.edges = list(filter(lambda x: x.node_to != to_id, self.edges))
+        optional_edge = list(filter(lambda x: x.node_to == to_id, self.edges))
+        if len(optional_edge) != 0:
+            return optional_edge[0]
+        else:
+            return None
 
     def calculate_heights(self):
-        visited = np.full(len(self.nodes), False, dtype=bool)
-        self.heights = np.full(len(self.nodes), -1, dtype=int)  # all heights are -1 initially
-        stack = LifoQueue()
+        # visited = np.full(len(self.nodes), False, dtype=bool)
+        visited = {node.id: False for node in self.nodes}
+        # self.heights = np.full(len(self.nodes), -1, dtype=int)  # all heights are -1 initially
+        # heights = {i: -1 for i in list(map(lambda x: x.id, self.nodes))}
+        stack = LifoQueue() # push fictional root on top
         stack.put(0)
         prev = None
         while stack.qsize() > 0:
@@ -91,24 +82,26 @@ class Tree:
         sequence = []
         node = self.get_node(vertex)
         if node is not None:
-            sequence.append(tuple([vertex, node.form, node.sent_name]))
-            visited = np.full(len(self.nodes), False, dtype=bool)
+            curr_edge = self.get_edge(vertex)
+            if curr_edge is not None:
+                sequence.append(tuple([vertex, node.lemma, node.form, node.sent_name, curr_edge.weight]))
+            visited = []
             stack = [vertex]
             while len(stack) > 0:
                 curr = stack[-1]
-                if not visited[curr]:
-                    visited[curr] = True
+                if curr not in visited:
+                    visited.append(curr)
                 children = self.get_children(curr)
                 if len(children) == 0:
                     stack.pop()
                 else:
                     all_visited_flag = True
                     for child in children:
-                        if not visited[child]:
+                        if child not in visited:
                             all_visited_flag = False
                             stack.append(child)
                             node = self.get_node(child)
-                            sequence.append(tuple([child, node.form, node.sent_name]))
+                            sequence.append(tuple([child, node.lemma, node.form, node.sent_name, self.get_edge(child).weight]))
                     if all_visited_flag:
                         stack.pop()
         return sequence
