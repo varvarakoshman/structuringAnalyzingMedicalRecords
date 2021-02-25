@@ -30,6 +30,8 @@ def read_vidal():
 def read_data():
     files = os.listdir(DATA_PATH)
     df_columns = ['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel']
+    # len_30 = ['100701_2', '112228_5', '233471_2', '339012_3', '366067_1', '109912_0', '255861_0', '281689_1', '148632_19', '192213_6', '246011_9', '254050_32', '359728_3', '361037_9', '368882_3_1', '361086_8', '152888_21_1', '129821_30', '270150_19', '246011_11', '221783_0_1', '227529_2', '266948_0_1', '359728_6', '361175_2', '51183_6']
+    # len_30 = ['100701_2', '112228_5', '233471_2', '339012_3', '366067_1', '109912_0', '255861_0', '281689_1', '148632_19', '192213_6', '246011_9', '254050_32', '359728_3']
     # full_df = []
     stable_df = []
     # long_df = []
@@ -85,11 +87,12 @@ def read_data():
     len_sent = {}
     for df in dfs_filtered:
         this_df = df[df.deprel != 'PUNC']
+        sent_n = list(this_df.sent_name)[0]
         words = list(this_df.form)
         if len(words) not in len_sent.keys():
-            len_sent[len(words)] = 1
+            len_sent[len(words)] = [sent_n]
         else:
-            len_sent[len(words)] += 1
+            len_sent[len(words)].append(sent_n)
         sent = '_'.join(list(this_df.sent_name)[0].split('_')[:2])
         # file_name = '_'.join(file.split('.')[0].split('_')[:2])
         if sent not in unique_sents.keys():

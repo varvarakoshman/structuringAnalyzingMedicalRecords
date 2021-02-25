@@ -147,7 +147,19 @@ def write_in_file(classes_part, classes_part_list, whole_tree, remapped_sent_rev
 
 
 def draw_histogram():
-    path = 'data/merged_extended.txt'
+    SMALL_SIZE = 12
+    MEDIUM_SIZE = 14
+    BIGGER_SIZE = 16
+
+    # plt.rc('font', size=MEDIUM_SIZE)  # controls default text sizes
+    plt.rc('axes', titlesize=BIGGER_SIZE)  # fontsize of the axes title
+    plt.rc('axes', labelsize=BIGGER_SIZE)  # fontsize of the x and y labels
+    plt.rc('xtick', labelsize=MEDIUM_SIZE)  # fontsize of the tick labels
+    plt.rc('ytick', labelsize=MEDIUM_SIZE)  # fontsize of the tick labels
+    # plt.rc('legend', fontsize=BIGGER_SIZE)  # legend fontsize
+    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+    # plt.rc('title', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+    path = MERGED_PATH
     try:
         with open(path, encoding='utf-8') as reader:
             class_entries = reader.readlines()
@@ -166,7 +178,7 @@ def draw_histogram():
             class_count += 1
         else:
             words = [w for w in line.split(':')[1].split(NEW_LINE)[0].split(" ") if w != EMPTY_STR]
-            curr_len = len(words)
+            curr_len = len(words) // 2 + 1
             local_c += 1
     res = {}
     for key, val in sorted(group_len.items()):
@@ -191,20 +203,21 @@ def draw_histogram():
     ax.set_xticklabels(frequencies)
     ax.set_xlabel('Размер класса')
     ax.set_ylabel('Число классов')
-    plt.bar(pos, alphab, width=0.8, color='b', align='center')
+    plt.xticks(rotation=45)
+    plt.bar(pos, alphab, width=0.9, color='b')
     plt.title('Число классов с равным числом повторов')
     plt.show()
 
     alphab = list(res_len.values())
     frequencies = list(res_len.keys())
 
-    pos = np.arange(len(frequencies))
-    ax = plt.axes()
-    ax.set_xticks(pos)
-    ax.set_xticklabels(frequencies)
-    ax.set_xlabel('Объем класса')
-    ax.set_ylabel('Число классов')
-    plt.bar(pos, alphab, width=0.4, color='b', align='center')
+    pos1 = np.arange(len(frequencies))
+    ax1 = plt.axes()
+    ax1.set_xticks(pos1)
+    ax1.set_xticklabels(frequencies)
+    ax1.set_xlabel('Объем класса')
+    ax1.set_ylabel('Число классов')
+    plt.bar(pos1, alphab, width=0.4, color='b')
     plt.title('Число классов с равным числом слов в повторе')
     plt.show()
 

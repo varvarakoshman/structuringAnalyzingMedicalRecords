@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from Preprocessing import read_data, replace_time_constructions
 from Tree import Tree, Node, Edge
 from Constants import *
-from Util import create_needed_directories, merge_in_file, write_in_file, new_test, write_tree_in_table
+from Util import create_needed_directories, merge_in_file, write_in_file, new_test, write_tree_in_table, draw_histogram
 from W2Vprocessing import load_trained_word2vec, train_word2vec
 
 
@@ -553,7 +553,7 @@ def main():
     # create_needed_directories()
     # sort_the_data()
     # pick_new_sentences()
-    # draw_histogram()
+    draw_histogram()
     start = time.time()
     trees_df_filtered = read_data()
     # trees_df_filtered = trees_df_filtered[:1998]
