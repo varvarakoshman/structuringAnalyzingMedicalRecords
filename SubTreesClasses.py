@@ -270,7 +270,8 @@ def find_subtree_children(whole_tree, classes_similar_mapping, children, subtree
         invalid_entries = {k: v for k, v in lemma_ids_dict_local.items() if len(v) > 1}
         for _, ids in invalid_entries.items():
             valid_id = set(ids) - whole_tree.additional_nodes
-            valid_ids_flatmapped.append(valid_id.pop())
+            if len(valid_id) > 0:
+                valid_ids_flatmapped.append(valid_id.pop())
         subtree_children = valid_ids_flatmapped
     return subtree_children
 
@@ -554,22 +555,22 @@ def main():
     # pick_new_sentences()
     # draw_histogram()
     start = time.time()
-    trees_full_df, trees_df_filtered, long_df = read_data()
+    trees_df_filtered = read_data()
     # trees_df_filtered = trees_df_filtered[:1998]
     replace_time_constructions(trees_df_filtered)
-    replace_time_constructions(trees_full_df)
-    replace_time_constructions(long_df)
+    # replace_time_constructions(trees_full_df)
+    # replace_time_constructions(long_df)
     print('Time on reading the data: ' + str(time.time() - start))
-    part_of_speech_node_id = dict(trees_full_df[['lemma', 'upostag']].groupby(['lemma', 'upostag']).groups.keys())
+    part_of_speech_node_id = dict(trees_df_filtered[['lemma', 'upostag']].groupby(['lemma', 'upostag']).groups.keys())
     #
     # # get all lemmas and create a dictionary to map to numbers
     # dict_lemmas = {lemma: [index] for index, lemma in enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
     dict_lemmas_full = {lemma: [index] for index, lemma in
-                        enumerate(dict.fromkeys(trees_full_df['lemma'].to_list()), 1)}
+                        enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
     dict_lemmas_rev = {index[0]: lemma for lemma, index in dict_lemmas_full.items()}
     dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
     dict_rel_rev = {v: k for k, v in dict_rel.items()}
-    remapped_sent = {sent_name: index for index, sent_name in enumerate(dict.fromkeys(trees_full_df['sent_name'].to_list()), 1)}
+    remapped_sent = {sent_name: index for index, sent_name in enumerate(dict.fromkeys(trees_df_filtered['sent_name'].to_list()), 1)}
     remapped_sent_rev = {index: sent_name for sent_name, index in remapped_sent.items()}
 
     # dict_lemmas = {lemma: [index] for index, lemma in enumerate(dict.fromkeys(long_df['lemma'].to_list()), 1)}
@@ -584,7 +585,7 @@ def main():
         if LOAD_TRAINED:
             load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id)
         else:
-            train_word2vec(trees_full_df)
+            train_word2vec(trees_df_filtered)
             load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id) #dict_lemmas,
         print('Time on word2vec: ' + str(time.time() - start))
 

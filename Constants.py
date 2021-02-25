@@ -1,5 +1,5 @@
 # Path constants
-DATA_PATH = r"data/main"
+DATA_PATH = r"data/final_corpus"
 ORIGINAL_DATA_PATH = "original_sentences_separeted"
 RESULT_PATH = "results_main"
 ADDITIONAL_CORPUS_PATH = "additionalCorpus/all_norm-sz100-w10-cb0-it1-min100.w2v"
