@@ -208,6 +208,7 @@ def draw_histogram():
     plt.title('Число классов с равным числом повторов')
     plt.show()
 
+    res_len = dict(sorted(res_len.items(), key=lambda x: x[0]))
     alphab = list(res_len.values())
     frequencies = list(res_len.keys())
 
