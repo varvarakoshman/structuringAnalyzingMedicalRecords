@@ -102,30 +102,118 @@ def merge_in_file():
 # POST-PROCESSING
 def write_in_file(classes_part, classes_part_list, whole_tree, remapped_sent_rev, dict_rel_rev):
     count = 0
-    classes_words = {}
-    for k, v in classes_part.items():
+    sent_unique_class_content = {}
+    classes_wordgroups = {}
+    classes_sents = {}
+    surviving_strings_classes = {}
+    for class_id, root_ids in classes_part.items():
         vertex_seq = {}
+        # vertex_sub_seq = {}
         count += 1
-        for vertex in v:
-            curr_height = max(whole_tree.heights[vertex])
-            vertex_seq[vertex] = whole_tree.simple_dfs(vertex, classes_part_list[k])
-            if len(vertex_seq.items()) > 0 and len(vertex_seq[list(vertex_seq)[0]]) > 1:
-                filename = RESULT_PATH + '/%s.txt' % (str(count))
-                try:
-                    with open(filename, 'w', encoding='utf-8') as filehandle:
-                        for _, value in vertex_seq.items():
-                            for val in value:
-                                node = whole_tree.get_node(val[0])
-                                if node.res_class is None:
-                                    node.res_class = count
-                            words = list(map(lambda list_entry: list_entry[2], value))
-                            if count not in classes_words.keys():
-                                classes_words[count] = words
-                            filehandle.write("len=%d h=%d sent=%s %s: %s\n" % (len(value), curr_height, value[0][1], remapped_sent_rev[value[0][3]],
-                                                                                   SPACE.join(SPACE.join(list(map(lambda list_entry: '(' + str(dict_rel_rev[list_entry[4]]) + ') ' + str(list_entry[2]), value))).split(' ')[1:])))
-                finally:
-                    filehandle.close()
-    return classes_words
+        temp_sent_set = set()
+        vertex_strings_dict = {}
+        vertex_seq_ids = {}
+        # vertex_sub_seq_ids = {}
+        for vertex_id in root_ids:
+            sent_id = whole_tree.get_node(vertex_id).sent_name
+            temp_sent_set.add(sent_id)
+            # sent_name = remapped_sent_rev[sent_id]
+            # curr_height = max(whole_tree.heights[vertex])
+            vertex_seq[vertex_id]= whole_tree.simple_dfs(vertex_id, classes_part_list[class_id])
+        if len(vertex_seq.items()) > 0 and len(vertex_seq[list(vertex_seq)[0]]) > 1:
+            for v_id, entries in vertex_seq.items():
+                sent_name = remapped_sent_rev[entries[0][3]]
+                for entry in entries:
+                    node = whole_tree.get_node(entry[0])
+                    if node.res_class is None:
+                        node.res_class = count
+                joined_res_str = SPACE.join(SPACE.join(list(map(lambda list_entry: '(' + str(dict_rel_rev[list_entry[4]]) + ') ' + str(list_entry[2]), entries))).split(SPACE)[1:])
+                if class_id not in classes_wordgroups.keys():
+                    classes_wordgroups[class_id] = [joined_res_str]
+                    classes_sents[class_id] = [sent_name]
+                else:
+                    classes_wordgroups[class_id].append(joined_res_str)
+                    classes_sents[class_id].append(sent_name)
+                vertex_strings_dict[v_id] = joined_res_str
+                vertex_seq_ids[v_id] = list(map(lambda list_entry: str(list_entry[4]) + str(list_entry[2]), entries))
+                # sub_seq_ids = []
+                # for sub_entries in vertex_sub_seq[v_id]:
+                #     # joined_sub_res_str = SPACE.join(SPACE.join(list(map(lambda list_entry: '(' + str(dict_rel_rev[list_entry[4]]) + ') ' + str(list_entry[2]), sub_entries))).split(SPACE)[1:])
+                #     ids_sub_extracted = list(map(lambda list_entry: str(list_entry[4]) + str(list_entry[2]), sub_entries))
+                #     sub_seq_ids.append(ids_sub_extracted)
+                # vertex_sub_seq_ids[v_id] = sub_seq_ids
+        sent_label = tuple(temp_sent_set)
+        if sent_label not in sent_unique_class_content.keys():
+            sent_unique_class_content[sent_label] = set([tuple(i) for i in list(vertex_seq_ids.values())])
+        else:
+            already_checked = set()
+            for v_id, new_array in vertex_seq_ids.items():
+                new_array_label = tuple(new_array)
+                if new_array_label not in already_checked:
+                    completely_new = new_array_label not in sent_unique_class_content[sent_label]
+                    if completely_new:
+                        filter_condition = False
+                        is_new_nested_in_existing = False
+                        # extend_condition = False
+                        ids_to_filter = set()
+                        # sub_seq_ids = vertex_sub_seq_ids[v_id]
+                        for existing_array in sent_unique_class_content[sent_label]:
+                            is_existing_nested_in_new = all(entr in new_array for entr in existing_array) and existing_array != new_array
+                            is_new_nested_in_existing = is_new_nested_in_existing or all(entr in existing_array for entr in new_array)
+                            # is_sub_new_nested_in_existing = any(all(entr in existing_array for entr in sub_seq) for sub_seq in sub_seq_ids)
+                            filter_condition = filter_condition or (is_existing_nested_in_new)# or is_sub_new_nested_in_existing)
+                            # extend_condition = extend_condition or (is_existing_nested_in_new or is_sub_new_nested_in_existing)
+                            if is_existing_nested_in_new:# or is_sub_new_nested_in_existing:
+                                ids_to_filter.add(existing_array)
+                        if filter_condition:
+                            sent_unique_class_content[sent_label] = sent_unique_class_content[sent_label] - ids_to_filter
+                        if not is_new_nested_in_existing:
+                            sent_unique_class_content[sent_label].add(new_array_label)
+                    already_checked.add(new_array_label)
+                    surviving_strings_classes[new_array_label] = class_id
+    classes_ids_filtered = [surviving_strings_classes[sent_group] for sent_groups in sent_unique_class_content.values() for sent_group in list(sent_groups)]
+    classes_wordgroups_filtered = {k: v for k, v in classes_wordgroups.items() if k in classes_ids_filtered}
+    classes_sents_filtered = {k: v for k, v in classes_sents.items() if k in classes_ids_filtered}
+    if MERGE_IN_FILE:
+        write_classes_in_txt(classes_wordgroups_filtered, classes_sents_filtered)
+    return classes_wordgroups_filtered
+
+
+def write_classes_in_txt(classes_wordgroups_filtered, classes_sents_filtered):
+    count = 1
+    for class_id, str_repeats in classes_wordgroups_filtered.items():
+        filename = RESULT_PATH + '/%s.txt' % (str(count))
+        try:
+            with open(filename, 'w', encoding='utf-8') as filehandle:
+                for repeat_count, str_repeat in enumerate(str_repeats):
+                    filehandle.write("sent=%s: %s\n" % (classes_sents_filtered[class_id][repeat_count], str_repeat))
+        finally:
+            filehandle.close()
+        count += 1
+
+    # filename = RESULT_PATH + '/%s.txt' % (str(count))
+    # try:
+    #     with open(filename, 'w', encoding='utf-8') as filehandle:
+    #         for _, value in vertex_seq.items():
+    #             for val in value:
+    #                 node = whole_tree.get_node(val[0])
+    #                 if node.res_class is None:
+    #                     node.res_class = count
+    #             joined_res_str = SPACE.join(SPACE.join(list(map(lambda list_entry: '(' + str(dict_rel_rev[list_entry[4]]) + ') ' + str(list_entry[2]), value))).split(' ')[1:])
+    #             temp_strings_set.add(joined_res_str)
+    #             filehandle.write("len=%d h=%d sent=%s %s: %s\n" % (len(value), curr_height, value[0][1], remapped_sent_rev[value[0][3]], joined_res_str))
+    # finally:
+    #     filehandle.close()
+
+
+# for vertex in v:
+#     filename = RESULT_PATH + '/%s.txt' % (str(count))
+#     curr_height = max(whole_tree.heights[vertex])
+#     try:
+#         with open(filename, 'w', encoding='utf-8') as filehandle:
+#             filehandle.write("len=%d h=%d sent=%s %s: %s\n" % (len(entries), curr_height, entries[0][1], remapped_sent_rev[entries[0][3]], joined_res_str))
+#     finally:
+#         filehandle.close()
 
 # def write_tree_in_table(whole_tree, dict_rel_rev, labels):
 #     source_1 = 'medicalTextTrees/gephi_edges_import_word2vec.csv'

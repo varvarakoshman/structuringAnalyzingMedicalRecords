@@ -19,6 +19,28 @@ class Edge:
         self.weight = weight  # relation type
 
 
+def find_path_to_vertex(parents_dict, target):
+    curr = target
+    result_path = []
+    while curr is not None:
+        result_path.append(curr)
+        if curr in parents_dict.keys():
+            curr = parents_dict[curr]
+        else:
+            curr = None
+    return result_path
+
+
+def remap_paths_to_str_tuples(vertex_label_tuple_dict, sub_sequences):
+    remapped_sub_sequences = []
+    for path_to_vertex in sub_sequences:
+        remapped_sequence = []
+        for vertex_id in reversed(path_to_vertex):
+            remapped_sequence.append(vertex_label_tuple_dict[vertex_id])
+        remapped_sub_sequences.append(remapped_sequence)
+    return remapped_sub_sequences
+
+
 class Tree:
 
     def __init__(self):
@@ -146,17 +168,24 @@ class Tree:
 
     def simple_dfs(self, vertex, subtree_vertices):
         sequence = []
+        # sub_sequences = []
+        parents_dict = {}
+        vertex_label_tuple_dict = {}
         node = self.get_node(vertex)
         if node is not None:
-            sequence.append(tuple([vertex, node.lemma, node.form, node.sent_name, self.get_edge(vertex)[0].weight]))
+            root_tuple = tuple([vertex, node.lemma, node.form, node.sent_name, self.get_edge(vertex)[0].weight])
+            sequence.append(root_tuple)
+            vertex_label_tuple_dict[vertex] = root_tuple
             visited = []
             stack = [vertex]
             while len(stack) > 0:
                 curr = stack[-1]
                 if curr not in visited:
                     visited.append(curr)
-                children = self.get_children(curr)
+                children = sorted(self.get_children(curr))
                 if len(children) == 0:
+                    # path_to_vertex = find_path_to_vertex(parents_dict, curr)
+                    # sub_sequences.append(path_to_vertex)
                     stack.pop()
                 else:
                     all_visited_flag = True
@@ -164,11 +193,16 @@ class Tree:
                         if child in subtree_vertices and child not in visited:
                             all_visited_flag = False
                             stack.append(child)
+                            parents_dict[child] = curr
                             node = self.get_node(child)
-                            sequence.append(tuple([child, node.lemma, node.form, node.sent_name, self.get_edge(child)[0].weight]))
+                            vertex_tuple = tuple(
+                                [child, node.lemma, node.form, node.sent_name, self.get_edge(child)[0].weight])
+                            vertex_label_tuple_dict[child] = vertex_tuple
+                            sequence.append(vertex_tuple)
                     if all_visited_flag:
                         stack.pop()
-        return sequence
+        # remapped_sub_sequences = remap_paths_to_str_tuples(vertex_label_tuple_dict, sub_sequences)
+        return sequence#, remapped_sub_sequences
 
     def dfs_subtree(self, vertex, subtree_vertices):
         sequence = []

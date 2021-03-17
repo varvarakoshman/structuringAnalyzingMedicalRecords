@@ -32,7 +32,6 @@ def read_data():
     df_columns = ['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel']
     # len_30 = ['100701_2', '112228_5', '233471_2', '339012_3', '366067_1', '109912_0', '255861_0', '281689_1', '148632_19', '192213_6', '246011_9', '254050_32', '359728_3', '361037_9', '368882_3_1', '361086_8', '152888_21_1', '129821_30', '270150_19', '246011_11', '221783_0_1', '227529_2', '266948_0_1', '359728_6', '361175_2', '51183_6']
     # len_30 = ['100701_2', '112228_5', '233471_2', '339012_3', '366067_1', '109912_0', '255861_0', '281689_1', '148632_19', '192213_6', '246011_9', '254050_32', '359728_3']
-    # full_df = []
     stable_df = []
     # long_df = []
     unique_sents = {}
@@ -80,9 +79,10 @@ def read_data():
                         sent_words = ' '.join(list(df.form))
                     except TypeError as te:
                         jjjj = []
-                    if sent_words not in sent_history:
-                        sent_history.append(sent_words)
-                        dfs_filtered.append(df)
+                    dfs_filtered.append(df)
+                    # if sent_words not in sent_history:
+                    #     sent_history.append(sent_words)
+                    #     dfs_filtered.append(df)
     # trees_df = pd.concat(stable_df, axis=0, ignore_index=True)
     len_sent = {}
     for df in dfs_filtered:
@@ -138,7 +138,7 @@ def read_data():
     # target_sents = list({'44112_8', '38674_5', '55654_2', '35628_5'})
     # target_sents = list({'44112_8', '55654_2', '32867_6', '57809_7'})  # TEST
     # target_sents = list({'55654_2', '35628_5', '32867_6', '57809_7', '57126_7'})  # TEST
-    # target_sents = list({'57809_7', '57126_7'})  # TEST
+    target_sents = list({'57809_7', '57126_7'})  # TEST
     # target_sents = list({'55338_41', '58401_7'})  # TEST
     # target_sents = list({'46855_3', '48408_0', '37676_3', '56109_5', '56661_0', '54743_1'}) # TEST !!!!trickyyyy
     # target_sents = list({'37535_4', '31635_2', '39786_8'}) # TEST !!!!trickyyyy
@@ -150,14 +150,15 @@ def read_data():
     # target_sents = list({'53718_0', '46007_0', '56109_2', '41184_0'}) # test for plain
     # target_sents = list({'167529_9', '152369_9', '172030_9', '172030_23', '48408_0'}) # meeeeeess
 
-    # trees_df_filtered = trees_full_df.loc[trees_full_df.sent_name.isin(target_sents)] # TEST
+    test_df =  trees_df_filtered.loc[trees_df_filtered.sent_name.isin(target_sents)] # TEST
     # trees_full_df.loc[trees_full_df.index.isin(replaced_numbers)].assign(upostag = 'N')
 
     # trees_df_filtered = trees_df_filtered.head(513)
     # trees_df_filtered = trees_df_filtered.head(339)
     # trees_df_filtered = trees_df_filtered.head(411)
     # trees_df_filtered = trees_df_filtered.head(431)
-    return trees_df_filtered#, long_df_filtered, trees_full_df
+    # trees_df_filtered = trees_df_filtered.head(4824)
+    return trees_df_filtered, test_df
 
 
 # PRE-PROCESSING

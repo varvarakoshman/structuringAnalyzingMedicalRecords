@@ -8,8 +8,9 @@ import matplotlib.pyplot as plt
 from Preprocessing import read_data, replace_time_constructions
 from Tree import Tree, Node, Edge
 from Constants import *
-from Util import create_needed_directories, merge_in_file, write_in_file, new_test, write_tree_in_table, draw_histogram
-from W2Vprocessing import load_trained_word2vec, train_word2vec
+from Util import create_needed_directories, merge_in_file, write_in_file, new_test, write_tree_in_table, draw_histogram, \
+    filter_classes
+from W2Vprocessing import load_trained_word2vec, train_word2vec, train_node2vec
 
 
 def construct_tree(trees_df_filtered, dict_lemmas, dict_rel, remapped_sent):
@@ -553,9 +554,10 @@ def main():
     # create_needed_directories()
     # sort_the_data()
     # pick_new_sentences()
-    draw_histogram()
+    # draw_histogram()
     start = time.time()
-    trees_df_filtered = read_data()
+    trees_df_filtered, test_df = read_data() # TEST
+    # trees_df_filtered = read_data()
     # trees_df_filtered = trees_df_filtered[:1998]
     replace_time_constructions(trees_df_filtered)
     # replace_time_constructions(trees_full_df)
@@ -583,20 +585,27 @@ def main():
     if RUN_WITH_W2V:
         start = time.time()
         if LOAD_TRAINED:
-            load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id)
+            # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id)
+            load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_node2vec.model")
+            # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained.model")
         else:
-            train_word2vec(trees_df_filtered)
-            load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id) #dict_lemmas,
+            # train_word2vec(trees_df_filtered)
+            whole_tree_plain = construct_tree(trees_df_filtered, dict_lemmas_full, dict_rel, remapped_sent) # graph is needed for node2vec
+            whole_tree_plain.set_help_dict()
+            train_node2vec(whole_tree_plain, dict_lemmas_rev)
+            # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id) #dict_lemmas,
+            load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_node2vec.model")
         print('Time on word2vec: ' + str(time.time() - start))
 
     start = time.time()
     # long_df = long_df[:1223]
     # whole_tree = construct_tree(trees_df_filtered, dict_lemmas, dict_rel)
-    whole_tree = construct_tree(trees_df_filtered, dict_lemmas_full, dict_rel, remapped_sent)
+    whole_tree = construct_tree(test_df, dict_lemmas_full, dict_rel, remapped_sent) # TEST
+    # whole_tree = construct_tree(trees_df_filtered, dict_lemmas_full, dict_rel, remapped_sent)
     # whole_tree = new_test()
     # whole_tree = construct_tree(long_df, dict_lemmas, dict_rel)
     # write_tree_in_table(whole_tree)
-    # print('Time on constructing the tree: ' + str(time.time() - start))
+    print('Time on constructing the tree: ' + str(time.time() - start))
 
     whole_tree.set_help_dict()
     # partition nodes by height
@@ -619,10 +628,10 @@ def main():
     # classes for partial repeats
     start = time.time()
     classes_part, classes_part_list, init_labels = compute_part_subtrees(whole_tree, dict_lemmas_size, grouped_heights)
-    write_tree_in_table(whole_tree)
+    # write_tree_in_table(whole_tree)
     print('Time on calculating partial repeats: ' + str(time.time() - start))
     write_in_file(classes_part, classes_part_list, whole_tree, remapped_sent_rev, dict_rel_rev)
-    merge_in_file()
+    # merge_in_file()
     gg = []
 
     # TEST
