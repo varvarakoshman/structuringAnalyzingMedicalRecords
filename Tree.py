@@ -19,28 +19,6 @@ class Edge:
         self.weight = weight  # relation type
 
 
-def find_path_to_vertex(parents_dict, target):
-    curr = target
-    result_path = []
-    while curr is not None:
-        result_path.append(curr)
-        if curr in parents_dict.keys():
-            curr = parents_dict[curr]
-        else:
-            curr = None
-    return result_path
-
-
-def remap_paths_to_str_tuples(vertex_label_tuple_dict, sub_sequences):
-    remapped_sub_sequences = []
-    for path_to_vertex in sub_sequences:
-        remapped_sequence = []
-        for vertex_id in reversed(path_to_vertex):
-            remapped_sequence.append(vertex_label_tuple_dict[vertex_id])
-        remapped_sub_sequences.append(remapped_sequence)
-    return remapped_sub_sequences
-
-
 class Tree:
 
     def __init__(self):
@@ -168,7 +146,6 @@ class Tree:
 
     def simple_dfs(self, vertex, subtree_vertices):
         sequence = []
-        # sub_sequences = []
         parents_dict = {}
         vertex_label_tuple_dict = {}
         node = self.get_node(vertex)
@@ -184,8 +161,6 @@ class Tree:
                     visited.append(curr)
                 children = sorted(self.get_children(curr))
                 if len(children) == 0:
-                    # path_to_vertex = find_path_to_vertex(parents_dict, curr)
-                    # sub_sequences.append(path_to_vertex)
                     stack.pop()
                 else:
                     all_visited_flag = True
@@ -201,8 +176,7 @@ class Tree:
                             sequence.append(vertex_tuple)
                     if all_visited_flag:
                         stack.pop()
-        # remapped_sub_sequences = remap_paths_to_str_tuples(vertex_label_tuple_dict, sub_sequences)
-        return sequence#, remapped_sub_sequences
+        return sequence
 
     def dfs_subtree(self, vertex, subtree_vertices):
         sequence = []

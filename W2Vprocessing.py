@@ -1,4 +1,7 @@
 from gensim.models import Word2Vec, KeyedVectors
+from matplotlib import pyplot
+from sklearn.manifold import TSNE
+
 from Constants import *
 import re
 import pandas as pd
@@ -78,7 +81,22 @@ def load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, model_name):
     for k, v in similar_lemmas_dict.items():
         stable = set(list(dict.fromkeys(v))) - most_freq
         similar_lemmas_dict_filtered[k] = list(stable)[:5]
-    jjj = []
     for lemma, similar_lemmas in similar_lemmas_dict_filtered.items():
         for similar_lemma in similar_lemmas:
             dict_lemmas_full[lemma].append(dict_lemmas_full[similar_lemma][0])
+
+
+def visualize_embeddings(dict_lemmas_full, n2v_model_name, w2v_model_name):
+    n2v_medical_model = Word2Vec.load(n2v_model_name)
+    w2v_medical_model = Word2Vec.load(w2v_model_name)
+    n2v_embeddings_to_cluster = [n2v_medical_model[word] for word in dict_lemmas_full.keys()]
+    w2v_embeddings_to_cluster = [w2v_medical_model[word] for word in dict_lemmas_full.keys()]
+    n2v_transformed_embeddings = TSNE(n_components=2, perplexity=8).fit_transform(n2v_embeddings_to_cluster)
+    w2v_transformed_embeddings = TSNE(n_components=2, perplexity=8).fit_transform(w2v_embeddings_to_cluster)
+    for i, similar_lemma in enumerate(dict_lemmas_full.keys()):
+        pyplot.annotate(similar_lemma, xy=(n2v_transformed_embeddings[i, 0], n2v_transformed_embeddings[i, 1]))
+        pyplot.annotate(similar_lemma, xy=(w2v_transformed_embeddings[i, 0], w2v_transformed_embeddings[i, 1]))
+    n2v = pyplot.scatter(n2v_transformed_embeddings[:, 0], n2v_transformed_embeddings[:, 1], color='r')
+    w2v = pyplot.scatter(w2v_transformed_embeddings[:, 0], w2v_transformed_embeddings[:, 1], color='b')
+    pyplot.legend((n2v, w2v), ('Node2Vec', 'Word2Vec'))
+    pyplot.show()

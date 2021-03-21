@@ -8,9 +8,8 @@ import matplotlib.pyplot as plt
 from Preprocessing import read_data, replace_time_constructions
 from Tree import Tree, Node, Edge
 from Constants import *
-from Util import create_needed_directories, merge_in_file, write_in_file, new_test, write_tree_in_table, draw_histogram, \
-    filter_classes
-from W2Vprocessing import load_trained_word2vec, train_word2vec, train_node2vec
+from Util import create_needed_directories, merge_in_file, write_in_file, new_test, write_tree_in_table, draw_histogram, write_in_file_old
+from W2Vprocessing import load_trained_word2vec, train_word2vec, train_node2vec, visualize_embeddings
 
 
 def construct_tree(trees_df_filtered, dict_lemmas, dict_rel, remapped_sent):
@@ -556,8 +555,8 @@ def main():
     # pick_new_sentences()
     # draw_histogram()
     start = time.time()
-    trees_df_filtered, test_df = read_data() # TEST
-    # trees_df_filtered = read_data()
+    # trees_df_filtered, test_df = read_data() # TEST
+    trees_df_filtered = read_data()
     # trees_df_filtered = trees_df_filtered[:1998]
     replace_time_constructions(trees_df_filtered)
     # replace_time_constructions(trees_full_df)
@@ -576,7 +575,7 @@ def main():
     remapped_sent_rev = {index: sent_name for sent_name, index in remapped_sent.items()}
 
     # dict_lemmas = {lemma: [index] for index, lemma in enumerate(dict.fromkeys(long_df['lemma'].to_list()), 1)}
-    # dict_form_lemma = dict(zip(long_df['form'].to_list(), long_df['lemma'].to_list()))
+    dict_form_lemma = dict(zip(trees_df_filtered['form'].to_list(), trees_df_filtered['lemma'].to_list()))
     # dict_lemmas_full = {lemma: [index] for index, lemma in
     #                     enumerate(dict.fromkeys(trees_full_df['lemma'].to_list()), 1)}
     # dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(long_df['deprel'].to_list()))}
@@ -586,8 +585,8 @@ def main():
         start = time.time()
         if LOAD_TRAINED:
             # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id)
-            load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_node2vec.model")
-            # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained.model")
+            load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_node2vec.model")  # node2vec
+            # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained.model") # word2vec
         else:
             # train_word2vec(trees_df_filtered)
             whole_tree_plain = construct_tree(trees_df_filtered, dict_lemmas_full, dict_rel, remapped_sent) # graph is needed for node2vec
@@ -600,8 +599,9 @@ def main():
     start = time.time()
     # long_df = long_df[:1223]
     # whole_tree = construct_tree(trees_df_filtered, dict_lemmas, dict_rel)
-    whole_tree = construct_tree(test_df, dict_lemmas_full, dict_rel, remapped_sent) # TEST
-    # whole_tree = construct_tree(trees_df_filtered, dict_lemmas_full, dict_rel, remapped_sent)
+    # whole_tree = construct_tree(test_df, dict_lemmas_full, dict_rel, remapped_sent) # TEST
+    whole_tree = construct_tree(trees_df_filtered, dict_lemmas_full, dict_rel, remapped_sent)
+    # visualize_embeddings(dict_lemmas_full, "trained_node2vec.model", "trained.model")
     # whole_tree = new_test()
     # whole_tree = construct_tree(long_df, dict_lemmas, dict_rel)
     # write_tree_in_table(whole_tree)
@@ -630,8 +630,16 @@ def main():
     classes_part, classes_part_list, init_labels = compute_part_subtrees(whole_tree, dict_lemmas_size, grouped_heights)
     # write_tree_in_table(whole_tree)
     print('Time on calculating partial repeats: ' + str(time.time() - start))
-    write_in_file(classes_part, classes_part_list, whole_tree, remapped_sent_rev, dict_rel_rev)
-    # merge_in_file()
+    # old
+    # start = time.time()   # write_in_file_old(classes_part, classes_part_list, whole_tree, remapped_sent_rev, dict_rel_rev)
+    # merge_in_file(RESULT_PATH_OLD, MERGED_PATH_OLD)
+    # print('Time on writing data old: ' + str(time.time() - start))
+    # new
+    start = time.time()
+    write_in_file(classes_part, classes_part_list, whole_tree, remapped_sent_rev, dict_rel_rev, dict_form_lemma)
+
+    # merge_in_file(RESULT_PATH, MERGED_PATH)
+    print('Time on writing data new: ' + str(time.time() - start))
     gg = []
 
     # TEST

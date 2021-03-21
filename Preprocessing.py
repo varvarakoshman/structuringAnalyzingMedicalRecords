@@ -79,10 +79,10 @@ def read_data():
                         sent_words = ' '.join(list(df.form))
                     except TypeError as te:
                         jjjj = []
-                    dfs_filtered.append(df)
-                    # if sent_words not in sent_history:
-                    #     sent_history.append(sent_words)
-                    #     dfs_filtered.append(df)
+                    # dfs_filtered.append(df)
+                    if sent_words not in sent_history:
+                        sent_history.append(sent_words)
+                        dfs_filtered.append(df)
     # trees_df = pd.concat(stable_df, axis=0, ignore_index=True)
     len_sent = {}
     for df in dfs_filtered:
@@ -138,7 +138,7 @@ def read_data():
     # target_sents = list({'44112_8', '38674_5', '55654_2', '35628_5'})
     # target_sents = list({'44112_8', '55654_2', '32867_6', '57809_7'})  # TEST
     # target_sents = list({'55654_2', '35628_5', '32867_6', '57809_7', '57126_7'})  # TEST
-    target_sents = list({'57809_7', '57126_7'})  # TEST
+    # target_sents = list({'57809_7', '57126_7'})  # TEST
     # target_sents = list({'55338_41', '58401_7'})  # TEST
     # target_sents = list({'46855_3', '48408_0', '37676_3', '56109_5', '56661_0', '54743_1'}) # TEST !!!!trickyyyy
     # target_sents = list({'37535_4', '31635_2', '39786_8'}) # TEST !!!!trickyyyy
@@ -150,7 +150,7 @@ def read_data():
     # target_sents = list({'53718_0', '46007_0', '56109_2', '41184_0'}) # test for plain
     # target_sents = list({'167529_9', '152369_9', '172030_9', '172030_23', '48408_0'}) # meeeeeess
 
-    test_df =  trees_df_filtered.loc[trees_df_filtered.sent_name.isin(target_sents)] # TEST
+    # test_df = trees_df_filtered.loc[trees_df_filtered.sent_name.isin(target_sents)] # TEST
     # trees_full_df.loc[trees_full_df.index.isin(replaced_numbers)].assign(upostag = 'N')
 
     # trees_df_filtered = trees_df_filtered.head(513)
@@ -158,7 +158,7 @@ def read_data():
     # trees_df_filtered = trees_df_filtered.head(411)
     # trees_df_filtered = trees_df_filtered.head(431)
     # trees_df_filtered = trees_df_filtered.head(4824)
-    return trees_df_filtered, test_df
+    return trees_df_filtered
 
 
 # PRE-PROCESSING
