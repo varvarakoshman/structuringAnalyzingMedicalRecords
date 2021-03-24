@@ -4,13 +4,16 @@
 
 import csv
 import os
+import re
 
-import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
 
 from Constants import *
-from Tree import Tree, Node, Edge
+from Preprocessing import months, day_times, seasons, time_labels
+
+pattern_verb_check = re.compile('(([Z])*([QIRPCS])*)+')
+pattern_help_verbs_in_row = re.compile("^Z{2,}.*$")
+pattern_not_help_verb = r'[^Z]'
 
 
 def create_needed_directories():
@@ -40,28 +43,27 @@ def write_tree_in_table(whole_tree):
 
 
 def read_med_data():
-    df_disease = pd.read_excel("medicalTextTrees/support_med_data.xlsx", sheet_name='Болезнь')
+    df_disease = pd.read_excel(MEDICAL_DICTIONARY, sheet_name='Болезнь')
     diseases = [x.lower() for x in list(df_disease.Name)]
-    df_symp = pd.read_excel("medicalTextTrees/support_med_data.xlsx", sheet_name='Симптом')
+    df_symp = pd.read_excel(MEDICAL_DICTIONARY, sheet_name='Симптом')
     symptoms = [x.lower() for x in df_symp.Name.to_list()]
-    df_doc = pd.read_excel("medicalTextTrees/support_med_data.xlsx", sheet_name='Врач')
+    df_doc = pd.read_excel(MEDICAL_DICTIONARY, sheet_name='Врач')
     docs = [x.lower() for x in df_doc.Name.to_list()]
-    df_drug = pd.read_excel("medicalTextTrees/support_med_data.xlsx", sheet_name='Лекарство')
+    df_drug = pd.read_excel(MEDICAL_DICTIONARY, sheet_name='Лекарство')
     drugs = [x.lower() for x in df_drug.Name.to_list()]
     return diseases, symptoms, docs, drugs
 
 
-def label_classes(classes_words, dict_form_lemma):
+def label_classes(classes_words, classes_count_passive_verbs):
     diseases, symptoms, docs, drugs = read_med_data()
-    dis = 'Болезнь'
-    sym = 'Симптом'
-    doc = 'Врач'
-    drg = 'Лекарство'
-    labels = {}
-    for k, v in classes_words.items():
-        freqs = dict(zip([dis, sym, doc, drg], [0, 0, 0, 0]))
-        for v_i in v:
-            lemma = dict_form_lemma[v_i]
+    labels = ['Болезнь', 'Симптом', 'Врач', 'Лекарство', 'Событие', 'Временная метка']
+    dis, sym, doc, drg, event, time = labels
+    # times = months + day_times + seasons
+    times = ['#месяц', '#времясуток', '#сезон'] + time_labels
+    class_labels = {}
+    for class_id, words in classes_words.items():
+        freqs = dict(zip([dis, sym, doc, drg, event, time], [0, 0, 0, 0, 0, 0]))
+        for lemma in words:
             if lemma in diseases:
                 freqs[dis] += 1
             elif lemma in symptoms:
@@ -70,13 +72,20 @@ def label_classes(classes_words, dict_form_lemma):
                 freqs[doc] += 1
             elif lemma in drugs:
                 freqs[drg] += 1
+            elif lemma in times:
+                freqs[time] += 1
+        if all(value == 0 for value in freqs.values()):
+            freqs[event] = classes_count_passive_verbs[class_id]
         sorted_d = dict(sorted(freqs.items(), key=lambda x: x[1], reverse=True))
         if max(sorted_d.values()) > 0:
             possible_label = next(iter(sorted_d))
         else:
             possible_label = EMPTY_STR
-        labels[k] = possible_label
-    return labels
+        class_labels[class_id] = possible_label
+    return class_labels
+
+
+# def group_and_log()
 
 
 # POST-PROCESSING
@@ -100,7 +109,7 @@ def merge_in_file(path_from, path_to):
 
 
 # POST-PROCESSING
-def write_in_file(classes_part, classes_part_list, whole_tree, remapped_sent_rev, dict_rel_rev, dict_form_lemma):
+def filter_classes(classes_part, classes_part_list, whole_tree, remapped_sent_rev, dict_form_lemma):
     count = 0
     sent_unique_class_content = {}
     classes_wordgroups = {}
@@ -111,30 +120,23 @@ def write_in_file(classes_part, classes_part_list, whole_tree, remapped_sent_rev
         vertex_seq = {}
         count += 1
         temp_sent_set = set()
-        vertex_strings_dict = {}
         vertex_seq_ids = {}
         for vertex_id in root_ids:
             sent_id = whole_tree.get_node(vertex_id).sent_name
             temp_sent_set.add(sent_id)
-            vertex_seq[vertex_id]= whole_tree.simple_dfs(vertex_id, classes_part_list[class_id])
+            vertex_seq[vertex_id] = whole_tree.simple_dfs(vertex_id, classes_part_list[class_id])
         if len(vertex_seq.items()) > 0 and len(vertex_seq[list(vertex_seq)[0]]) > 1:
             for v_id, entries in vertex_seq.items():
-                sent_name = remapped_sent_rev[entries[0][3]]
-                for entry in entries:
-                    node = whole_tree.get_node(entry[0])
-                    if node.res_class is None:
-                        node.res_class = count
-                for ent in entries:
-                    all_forms.add(ent[2])
-                joined_res_str = SPACE.join(list(map(lambda list_entry: '(' + str(dict_rel_rev[list_entry[4]]) + ') ' + list_entry[2], entries)))
+                sent_name = remapped_sent_rev[entries[0].sent_name]
+                for ent in entries: # FOR WRITING ALL LEMMAS
+                    all_forms.add(ent.form)
                 if class_id not in classes_wordgroups.keys():
-                    classes_wordgroups[class_id] = [joined_res_str]
+                    classes_wordgroups[class_id] = [tuple(entries)]
                     classes_sents[class_id] = [sent_name]
                 else:
-                    classes_wordgroups[class_id].append(joined_res_str)
+                    classes_wordgroups[class_id].append(tuple(entries))
                     classes_sents[class_id].append(sent_name)
-                vertex_strings_dict[v_id] = joined_res_str
-                vertex_seq_ids[v_id] = list(map(lambda list_entry: str(list_entry[4]) + str(list_entry[2]), entries))
+                vertex_seq_ids[v_id] = list(map(lambda list_entry: str(whole_tree.get_edge(list_entry.id)[0].weight) + list_entry.form, entries))
         sent_label = tuple(temp_sent_set)
         if sent_label not in sent_unique_class_content.keys():
             new_entries_set = set([tuple(i) for i in list(vertex_seq_ids.values())])
@@ -166,15 +168,84 @@ def write_in_file(classes_part, classes_part_list, whole_tree, remapped_sent_rev
     classes_ids_filtered = set([surviving_strings_classes[sent_group] for sent_groups in sent_unique_class_content.values() for sent_group in list(sent_groups)])
     classes_wordgroups_filtered = {k: v for k, v in classes_wordgroups.items() if k in classes_ids_filtered}
     classes_sents_filtered = {k: v for k, v in classes_sents.items() if k in classes_ids_filtered}
-    if MERGE_IN_FILE:
-        write_classes_in_txt(classes_wordgroups_filtered, classes_sents_filtered)
-    all_lemmas = set([dict_form_lemma[form] for form in list(all_forms)])
+    all_lemmas = set([dict_form_lemma[form] for form in all_forms])
     write_all_lemmas(all_lemmas)
-    return classes_wordgroups_filtered
+    return classes_wordgroups_filtered, classes_sents_filtered
+
+
+# filter long subsequences of prepositions
+def check1st(node_sequence):
+    seq_pos_tags = list(map(lambda node: node.pos_tag, node_sequence))
+    target_indices = [index for index, pos_tag in enumerate(seq_pos_tags) if pos_tag == 'S']
+    if len(target_indices) > 0:
+        prep_max_len = 0
+        curr_len = 1
+        for i in range(0, len(target_indices) - 1):
+            if target_indices[i + 1] - target_indices[i] == 1:
+                curr_len += 1
+            else:
+                if curr_len > prep_max_len:
+                    prep_max_len = curr_len
+                curr_len = 1
+        if prep_max_len > len(seq_pos_tags) - prep_max_len:
+            return False # filter if a sequence of prepositions takes the most of a string
+    return True
+
+
+def get_tags_merged(node_sequence, dict_form_lemma, verbs_to_filter):
+    return EMPTY_STR.join([node.pos_tag if dict_form_lemma[node.form] not in verbs_to_filter else 'Z' for node in node_sequence])
+
+
+# filter sequences with meaningless verbs
+def check2nd(node_sequence, dict_form_lemma, verbs_to_filter):
+    # Ex: была где был откуда : "ZCZC"
+    mapped_tags_str = get_tags_merged(node_sequence, dict_form_lemma, verbs_to_filter)
+    matched_substring = pattern_verb_check.match(mapped_tags_str)
+    if matched_substring is not None and len(matched_substring.group(0)) > len(mapped_tags_str) - len(matched_substring.group(0)):
+        return False
+    return True
+
+
+def get_squashed_seq(node_sequence, mapped_tags_str):
+    start_index = re.search(pattern_not_help_verb, mapped_tags_str).start()
+    squashed_seq = node_sequence[start_index:]
+    return squashed_seq
+
+
+def filter_meaningless_classes(classes_wordgroups_filtered, dict_form_lemma):
+    meaningful_classes = {}
+    meaningless_classes = {}
+    verbs_to_filter = ['быть', 'стать']
+    for class_id, node_sequences_list in classes_wordgroups_filtered.items():
+        node_sequence = node_sequences_list[0] # checking the 1st entry of a class (considering others don't differ in structure)
+        has_help_verb_as_root = dict_form_lemma[node_sequence[0].form] in verbs_to_filter
+        if check1st(node_sequence) and (not has_help_verb_as_root or check2nd(node_sequence, dict_form_lemma, verbs_to_filter)):
+            mapped_tags_str = get_tags_merged(node_sequence, dict_form_lemma, verbs_to_filter)
+            if has_help_verb_as_root and pattern_help_verbs_in_row.match(mapped_tags_str):
+                squashed_seq_list = []
+                for node_seq in node_sequences_list:
+                    squashed_seq_list.append(get_squashed_seq(node_seq, mapped_tags_str))
+                meaningful_classes[class_id] = squashed_seq_list
+            else:
+                meaningful_classes[class_id] = node_sequences_list
+        else:
+            meaningless_classes[class_id] = node_sequences_list
+    return meaningful_classes, meaningless_classes
+
+
+def get_all_words(meaningful_classes, dict_form_lemma):
+    classes_words = {}
+    classes_count_passive_verbs = {}
+    for class_id, node_sequences_list in meaningful_classes.items():
+        count_passive_verbs = len(list(filter(lambda node: node.pos_tag == 'V' and node.pos_extended[-3] == 'p', [node for node_seq in node_sequences_list for node in node_seq])))
+        classes_count_passive_verbs[class_id] = count_passive_verbs
+        words_in_class = set([node.form for node_seq in node_sequences_list for node in node_seq])
+        classes_words[class_id] = list(map(lambda form: dict_form_lemma[form], words_in_class))
+    return classes_words, classes_count_passive_verbs
 
 
 def write_all_lemmas(all_lemmas):
-    filename = "medicalTextTrees/all_lemmas_n2v.txt"
+    filename = ALL_LEMMAS_PATH_W2V
     try:
         with open(filename, 'w', encoding='utf-8') as filehandle:
             for lemma in all_lemmas:
@@ -183,17 +254,41 @@ def write_all_lemmas(all_lemmas):
         filehandle.close()
 
 
-def write_classes_in_txt(classes_wordgroups_filtered, classes_sents_filtered):
+def write_classes_in_txt(whole_tree, meningful_classes, classes_sents_filtered, dict_rel_rev, class_labels, path):
     count = 1
-    for class_id, str_repeats in classes_wordgroups_filtered.items():
-        filename = RESULT_PATH + '/%s.txt' % (str(count))
+    for class_id, node_seq_list in meningful_classes.items():
+        filename = path + '/%s.txt' % (str(count))
         try:
             with open(filename, 'w', encoding='utf-8') as filehandle:
-                for repeat_count, str_repeat in enumerate(str_repeats):
-                    filehandle.write("sent=%s: %s\n" % (classes_sents_filtered[class_id][repeat_count], str_repeat))
+                if class_labels: # empty dict comes for useless classes, which are also logged in file
+                    filehandle.write("label: %s\n" % (class_labels[class_id]))
+                for repeat_count, node_seq in enumerate(node_seq_list):
+                    joined_res_str = SPACE.join(list(map(lambda node: '(' + str(dict_rel_rev[whole_tree.get_edge(node.id)[0].weight]) + ') ' + node.form + ' /' + node.pos_tag + '/ ', node_seq)))
+                    filehandle.write("sent=%s: %s\n" % (classes_sents_filtered[class_id][repeat_count], joined_res_str))
         finally:
             filehandle.close()
         count += 1
+
+
+def extract_all_unique_phrases_from_merged_file():
+    try:
+        with open(ALGO_RESULT_N2V, 'r', encoding='utf-8') as reader:
+            class_entries = reader.readlines()
+    finally:
+        reader.close()
+    unique_phrases = set()
+    for line in class_entries:
+        if line != NEW_LINE:
+            words = line.split(':')[1].split(NEW_LINE)[0].split(SPACE)
+            words.remove(EMPTY_STR)
+            unique_phrases.add(tuple(words[1::2]))
+    filename = "medicalTextTrees/all_unique_phrases_forms.txt"
+    try:
+        with open(filename, 'w', encoding='utf-8') as writer:
+            for phrase in unique_phrases:
+                writer.write("%s\n" % SPACE.join(phrase))
+    finally:
+        writer.close()
 
 
 # POST-PROCESSING
@@ -225,6 +320,18 @@ def write_in_file_old(classes_part, classes_part_list, whole_tree, remapped_sent
     return classes_words
 
 
+def get_joint_lemmas(path1, path2):
+    try:
+        with open(path1, 'r', encoding='utf-8') as reader1, open(path2, 'r', encoding='utf-8') as reader2:
+            lemmas1 = reader1.readlines()
+            lemmas2 = reader2.readlines()
+    finally:
+        reader1.close()
+        reader2.close()
+    joint_lemmas = set(lemmas1).intersection(set(lemmas2))
+    cleared_lemmas = list(filter(lambda lemma: lemma != '.', list(map(lambda lemma: lemma.split('\n')[0], joint_lemmas))))
+    return cleared_lemmas
+
 # def write_tree_in_table(whole_tree, dict_rel_rev, labels):
 #     source_1 = 'medicalTextTrees/gephi_edges_import_word2vec.csv'
 #     source_2 = 'medicalTextTrees/gephi_nodes_import_word2vec.csv'
@@ -242,184 +349,3 @@ def write_in_file_old(classes_part, classes_part_list, whole_tree, remapped_sent
 #         for node in included_nodes:
 #             writer_2.writerow(
 #                 [node.id, (node.lemma, node.form, node.sent_name), node.res_class, labels[node.res_class]])
-
-
-def draw_histogram():
-    SMALL_SIZE = 12
-    MEDIUM_SIZE = 14
-    BIGGER_SIZE = 16
-
-    # plt.rc('font', size=MEDIUM_SIZE)  # controls default text sizes
-    plt.rc('axes', titlesize=BIGGER_SIZE)  # fontsize of the axes title
-    plt.rc('axes', labelsize=BIGGER_SIZE)  # fontsize of the x and y labels
-    plt.rc('xtick', labelsize=MEDIUM_SIZE)  # fontsize of the tick labels
-    plt.rc('ytick', labelsize=MEDIUM_SIZE)  # fontsize of the tick labels
-    # plt.rc('legend', fontsize=BIGGER_SIZE)  # legend fontsize
-    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-    # plt.rc('title', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-    path = MERGED_PATH
-    try:
-        with open(path, encoding='utf-8') as reader:
-            class_entries = reader.readlines()
-    finally:
-        reader.close()
-    class_count = 1
-    local_c = 0
-    curr_len = 0
-    group_len = {}
-    str_len = {}
-    for line in class_entries:
-        if line == NEW_LINE:
-            group_len[class_count] = local_c
-            str_len[class_count] = curr_len
-            local_c = 0
-            class_count += 1
-        else:
-            words = [w for w in line.split(':')[1].split(NEW_LINE)[0].split(" ") if w != EMPTY_STR]
-            curr_len = len(words) // 2 + 1
-            local_c += 1
-    res = {}
-    for key, val in sorted(group_len.items()):
-        if val not in res.keys():
-            res[val] = 1
-        else:
-            res[val] += 1
-    res_len = {}
-    for key, val in sorted(str_len.items()):
-        if val not in res_len.keys():
-            res_len[val] = 1
-        else:
-            res_len[val] += 1
-
-    res2 = dict(sorted(res.items(), key=lambda x: x[0]))
-    alphab = list(res2.values())
-    frequencies = list(res2.keys())
-
-    pos = np.arange(len(frequencies))
-    ax = plt.axes()
-    ax.set_xticks(pos)
-    ax.set_xticklabels(frequencies)
-    ax.set_xlabel('Размер класса')
-    ax.set_ylabel('Число классов')
-    plt.xticks(rotation=45)
-    plt.bar(pos, alphab, width=0.9, color='b')
-    plt.title('Число классов с равным числом повторов')
-    plt.show()
-
-    res_len = dict(sorted(res_len.items(), key=lambda x: x[0]))
-    alphab = list(res_len.values())
-    frequencies = list(res_len.keys())
-
-    pos1 = np.arange(len(frequencies))
-    ax1 = plt.axes()
-    ax1.set_xticks(pos1)
-    ax1.set_xticklabels(frequencies)
-    ax1.set_xlabel('Объем класса')
-    ax1.set_ylabel('Число классов')
-    plt.bar(pos1, alphab, width=0.4, color='b')
-    plt.title('Число классов с равным числом слов в повторе')
-    plt.show()
-
-
-def get_test_tree():
-    test_tree = Tree()
-    root_node = Node(0, 0, None, None)
-    # add root
-    Tree.add_node(test_tree, root_node)
-    # add test nodes
-    Tree.add_node(test_tree, Node(1, 18, None, 1))
-    Tree.add_node(test_tree, Node(2, 20, None, 1))
-    Tree.add_node(test_tree, Node(3, 3, None, 1))
-    Tree.add_node(test_tree, Node(4, 19, None, 1))
-    Tree.add_node(test_tree, Node(5, 8, None, 1))
-    Tree.add_node(test_tree, Node(6, 18, None, 2))
-    Tree.add_node(test_tree, Node(7, 20, None, 2))
-    Tree.add_node(test_tree, Node(8, 3, None, 2))
-    Tree.add_node(test_tree, Node(9, 7, None, 2))
-    Tree.add_node(test_tree, Node(10, 19, None, 2))
-    Tree.add_node(test_tree, Node(11, 18, None, 3))
-    Tree.add_node(test_tree, Node(12, 20, None, 3))
-    Tree.add_node(test_tree, Node(13, 7, None, 3))
-    Tree.add_node(test_tree, Node(14, 19, None, 3))
-    Tree.add_node(test_tree, Node(15, 8, None, 3))
-    # add test edges
-    Tree.add_edge(test_tree, Edge(0, 1, 0))
-    Tree.add_edge(test_tree, Edge(0, 6, 0))
-    Tree.add_edge(test_tree, Edge(0, 11, 0))
-    Tree.add_edge(test_tree, Edge(1, 2, 1))
-    Tree.add_edge(test_tree, Edge(6, 7, 1))
-    Tree.add_edge(test_tree, Edge(11, 12, 1))
-    Tree.add_edge(test_tree, Edge(2, 3, 4))
-    Tree.add_edge(test_tree, Edge(7, 8, 4))
-    Tree.add_edge(test_tree, Edge(2, 4, 9))
-    Tree.add_edge(test_tree, Edge(7, 10, 9))
-    Tree.add_edge(test_tree, Edge(12, 14, 9))
-    Tree.add_edge(test_tree, Edge(7, 9, 10))
-    Tree.add_edge(test_tree, Edge(12, 13, 10))
-    Tree.add_edge(test_tree, Edge(2, 5, 20))
-    Tree.add_edge(test_tree, Edge(12, 15, 20))
-    return test_tree
-
-
-def new_test():
-    test_tree = Tree()
-    root_node = Node(0, 0)
-    # add root
-    Tree.add_node(test_tree, root_node)
-    # add test nodes
-    Tree.add_node(test_tree, Node(1, lemma=18, sent_name=1, form=18))
-    Tree.add_node(test_tree, Node(2, lemma=20, sent_name=1, form=20))
-    Tree.add_node(test_tree, Node(3, lemma=3, sent_name=1, form=3))
-    Tree.add_node(test_tree, Node(4, lemma=19, sent_name=1, form=19))
-    Tree.add_node(test_tree, Node(5, lemma=5, sent_name=1, form=5))
-    Tree.add_node(test_tree, Node(6, lemma=6, sent_name=1, form=6))
-    Tree.add_node(test_tree, Node(7, lemma=8, sent_name=1, form=8))
-    Tree.add_node(test_tree, Node(8, lemma=18, sent_name=2, form=18))
-    Tree.add_node(test_tree, Node(9, lemma=20, sent_name=2, form=20))
-    Tree.add_node(test_tree, Node(10, lemma=3, sent_name=2, form=3))
-    Tree.add_node(test_tree, Node(11, lemma=4, sent_name=2, form=4))
-    Tree.add_node(test_tree, Node(12, lemma=7, sent_name=2, form=7))
-    Tree.add_node(test_tree, Node(13, lemma=19, sent_name=2, form=19))
-    Tree.add_node(test_tree, Node(14, lemma=2, sent_name=2, form=2))
-    Tree.add_node(test_tree, Node(15, lemma=18, sent_name=3, form=18))
-    Tree.add_node(test_tree, Node(16, lemma=20, sent_name=3, form=20))
-    Tree.add_node(test_tree, Node(17, lemma=7, sent_name=3, form=7))
-    Tree.add_node(test_tree, Node(18, lemma=19, sent_name=3, form=19))
-    Tree.add_node(test_tree, Node(19, lemma=8, sent_name=3, form=8))
-    Tree.add_node(test_tree, Node(22, lemma=14, sent_name=3, form=14))
-    # add test edges
-    Tree.add_edge(test_tree, Edge(0, 1, 0))
-    Tree.add_edge(test_tree, Edge(0, 8, 0))
-    Tree.add_edge(test_tree, Edge(0, 15, 0))
-    Tree.add_edge(test_tree, Edge(1, 2, 1))
-    Tree.add_edge(test_tree, Edge(2, 3, 4))
-    Tree.add_edge(test_tree, Edge(2, 4, 9))
-    Tree.add_edge(test_tree, Edge(2, 7, 20))
-    Tree.add_edge(test_tree, Edge(4, 5, 1))
-    Tree.add_edge(test_tree, Edge(5, 6, 1))
-    Tree.add_edge(test_tree, Edge(8, 9, 1))
-    Tree.add_edge(test_tree, Edge(9, 10, 4))
-    Tree.add_edge(test_tree, Edge(9, 12, 10))
-    Tree.add_edge(test_tree, Edge(9, 13, 9))
-    Tree.add_edge(test_tree, Edge(10, 11, 1))
-    Tree.add_edge(test_tree, Edge(15, 16, 1))
-    Tree.add_edge(test_tree, Edge(16, 17, 10))
-    Tree.add_edge(test_tree, Edge(16, 18, 9))
-    Tree.add_edge(test_tree, Edge(16, 19, 20))
-    Tree.add_edge(test_tree, Edge(8, 14, 2))
-    Tree.add_edge(test_tree, Edge(16, 22, 4))
-
-    # additional
-    Tree.add_node(test_tree, Node(20, lemma=14, sent_name=2, form=14))
-    Tree.add_node(test_tree, Node(21, lemma=9, sent_name=2, form=9))
-    Tree.add_node(test_tree, Node(23, lemma=21, sent_name=2, form=21))
-
-    Tree.add_edge(test_tree, Edge(9, 20, 4))
-    Tree.add_edge(test_tree, Edge(9, 21, 4))
-
-    test_tree.additional_nodes = {20, 21}
-    test_tree.similar_lemmas = {10: [20, 21]}
-
-    test_tree.global_similar_mapping = {20: 10, 21: 10, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, 10: 10,
-                                        11: 11, 12: 12, 13: 13, 14: 14, 15: 15, 16: 16, 17: 17, 18: 18, 19: 19, 22: 22}
-    return test_tree

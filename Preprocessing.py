@@ -14,6 +14,11 @@ pattern_year = re.compile('^[0-9]{4}$')
 pattern_full_date = re.compile('^([0-9]+\.){2}[0-9]+$')
 pattern_part_date = re.compile('^[0-9]+\.[0-9][1-9]+$')
 only_letters = re.compile("^[a-zA-Z]+$")
+months = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь',
+              'декабрь']
+day_times = ['утро', 'день', 'вечер', 'ночь']
+seasons = ['лето', 'осень', 'зима', 'весна']
+time_labels = ['год', 'г', 'месяц', 'неделя', 'сутки', 'день', 'час', 'минута', 'секунда']
 
 
 def read_vidal():
@@ -103,7 +108,7 @@ def read_data():
     trees_df = pd.concat(dfs_filtered, axis=0, ignore_index=True)
     # long_df = pd.concat(long_df, axis=0, ignore_index=True)
     # delete useless data
-    trees_df = trees_df.drop(columns=['xpostag', 'feats'], axis=1)
+    trees_df = trees_df.drop(columns=['xpostag'], axis=1)
     # trees_df.drop(index=[11067], inplace=True)
     trees_df.loc[13742, 'deprel'] = 'разъяснит'
 
@@ -138,6 +143,7 @@ def read_data():
     # target_sents = list({'44112_8', '38674_5', '55654_2', '35628_5'})
     # target_sents = list({'44112_8', '55654_2', '32867_6', '57809_7'})  # TEST
     # target_sents = list({'55654_2', '35628_5', '32867_6', '57809_7', '57126_7'})  # TEST
+    # target_sents = list({'93475_10_0', '106014_10', '128080_6', '162141_8', '56964_3', '56661_2', '37462_5', '34118_3', '152369_9', '41999_1', '263735_1', '281575_1'})  # TEST
     # target_sents = list({'57809_7', '57126_7'})  # TEST
     # target_sents = list({'55338_41', '58401_7'})  # TEST
     # target_sents = list({'46855_3', '48408_0', '37676_3', '56109_5', '56661_0', '54743_1'}) # TEST !!!!trickyyyy
@@ -158,7 +164,7 @@ def read_data():
     # trees_df_filtered = trees_df_filtered.head(411)
     # trees_df_filtered = trees_df_filtered.head(431)
     # trees_df_filtered = trees_df_filtered.head(4824)
-    return trees_df_filtered
+    return trees_df_filtered#, test_df
 
 
 # PRE-PROCESSING
@@ -186,10 +192,6 @@ def sort_the_data():
 
 
 def replace_time_constructions(df):
-    months = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь',
-              'декабрь']
-    day_times = ['утро', 'день', 'вечер', 'ночь']
-    seasons = ['лето', 'осень', 'зима', 'весна']
     for month in months:
         df.loc[df['lemma'] == month, 'lemma'] = '#месяц'
     for day_time in day_times:

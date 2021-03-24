@@ -8,7 +8,9 @@ import matplotlib.pyplot as plt
 from Preprocessing import read_data, replace_time_constructions
 from Tree import Tree, Node, Edge
 from Constants import *
-from Util import create_needed_directories, merge_in_file, write_in_file, new_test, write_tree_in_table, draw_histogram, write_in_file_old
+from Util import create_needed_directories, merge_in_file, filter_classes, write_tree_in_table, write_in_file_old, \
+    write_classes_in_txt, filter_meaningless_classes, get_all_words, label_classes, get_joint_lemmas
+from Visualisation import draw_histogram
 from W2Vprocessing import load_trained_word2vec, train_word2vec, train_node2vec, visualize_embeddings
 
 
@@ -35,10 +37,15 @@ def construct_tree(trees_df_filtered, dict_lemmas, dict_rel, remapped_sent):
             from_id = temp_dict.get(row['head'])
             weight = dict_rel.get(row['deprel'])
             sent = remapped_sent[row['sent_name']]
+            pos_tag = row['upostag']
+            pos_extended = row['feats']
             form = row['form']
             # create main node
-            curr_lemma = curr_lemmas[0]
-            whole_tree.create_new_node(main_id, curr_lemma, form, sent, weight, from_id)
+            try:
+                curr_lemma = curr_lemmas[0]
+            except TypeError as te:
+                ggg = []
+            whole_tree.create_new_node(main_id, curr_lemma, form, sent, pos_tag, pos_extended, weight, from_id)
             children = [main_id]
             edge_to_weight[main_id] = weight
             global_similar_mapping[main_id] = main_id
@@ -53,7 +60,7 @@ def construct_tree(trees_df_filtered, dict_lemmas, dict_rel, remapped_sent):
                         dict_lemmas_rev[curr_lemmas[i]] = {curr_lemma}
                     else:
                         dict_lemmas_rev[curr_lemmas[i]].add(curr_lemma)
-                    whole_tree.create_new_node(new_id_count, curr_lemmas[i], form, sent, weight, from_id)
+                    whole_tree.create_new_node(new_id_count, curr_lemmas[i], form, sent, pos_tag, pos_extended, weight, from_id)
                     edge_to_weight[new_id_count] = weight
                     if main_id not in similar_lemmas_dict.keys():
                         similar_lemmas_dict[main_id] = [new_id_count]
@@ -554,6 +561,8 @@ def main():
     # sort_the_data()
     # pick_new_sentences()
     # draw_histogram()
+    lemmas_list = get_joint_lemmas('medicalTextTrees/all_lemmas_n2v.txt', 'medicalTextTrees/all_lemmas_w2v.txt')
+    visualize_embeddings(lemmas_list, "trained_node2vec.model", "trained.model")
     start = time.time()
     # trees_df_filtered, test_df = read_data() # TEST
     trees_df_filtered = read_data()
@@ -568,6 +577,8 @@ def main():
     # dict_lemmas = {lemma: [index] for index, lemma in enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
     dict_lemmas_full = {lemma: [index] for index, lemma in
                         enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
+    # dict_lemmas_test = {lemma: [index] for index, lemma in
+    #                     enumerate(dict.fromkeys(test_df['lemma'].to_list()), 1)}
     dict_lemmas_rev = {index[0]: lemma for lemma, index in dict_lemmas_full.items()}
     dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
     dict_rel_rev = {v: k for k, v in dict_rel.items()}
@@ -599,9 +610,8 @@ def main():
     start = time.time()
     # long_df = long_df[:1223]
     # whole_tree = construct_tree(trees_df_filtered, dict_lemmas, dict_rel)
-    # whole_tree = construct_tree(test_df, dict_lemmas_full, dict_rel, remapped_sent) # TEST
+    # whole_tree = construct_tree(test_df, dict_lemmas_test, dict_rel, remapped_sent) # TEST
     whole_tree = construct_tree(trees_df_filtered, dict_lemmas_full, dict_rel, remapped_sent)
-    # visualize_embeddings(dict_lemmas_full, "trained_node2vec.model", "trained.model")
     # whole_tree = new_test()
     # whole_tree = construct_tree(long_df, dict_lemmas, dict_rel)
     # write_tree_in_table(whole_tree)
@@ -636,9 +646,23 @@ def main():
     # print('Time on writing data old: ' + str(time.time() - start))
     # new
     start = time.time()
-    write_in_file(classes_part, classes_part_list, whole_tree, remapped_sent_rev, dict_rel_rev, dict_form_lemma)
+    classes_wordgroups_filtered, classes_sents_filtered = filter_classes(classes_part, classes_part_list, whole_tree, remapped_sent_rev, dict_form_lemma)
+    meaningful_classes, meaningless_classes = filter_meaningless_classes(classes_wordgroups_filtered, dict_form_lemma)
+    classes_words, classes_count_passive_verbs = get_all_words(meaningful_classes, dict_form_lemma)
+    class_labels = label_classes(classes_words, classes_count_passive_verbs)
 
-    # merge_in_file(RESULT_PATH, MERGED_PATH)
+    # group classes by assigned labels
+    grouped_classes_by_label = defaultdict(list)
+    for key, value in sorted(class_labels.items()):
+        grouped_classes_by_label[value].append(key)
+    # group_and_log()
+    if WRITE_IN_FILES:
+        # meaningful
+        write_classes_in_txt(whole_tree, meaningful_classes, classes_sents_filtered, dict_rel_rev, class_labels, RESULT_PATH)
+        merge_in_file(RESULT_PATH, MERGED_PATH)
+        # meaningless
+        write_classes_in_txt(whole_tree, meaningless_classes, classes_sents_filtered, dict_rel_rev, {}, RESULT_PATH_FILTERED)
+        merge_in_file(RESULT_PATH_FILTERED, MERGED_PATH_FILTERED)
     print('Time on writing data new: ' + str(time.time() - start))
     gg = []
 

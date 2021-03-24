@@ -86,17 +86,24 @@ def load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, model_name):
             dict_lemmas_full[lemma].append(dict_lemmas_full[similar_lemma][0])
 
 
-def visualize_embeddings(dict_lemmas_full, n2v_model_name, w2v_model_name):
+def visualize_embeddings(lemmas_list, n2v_model_name, w2v_model_name):
     n2v_medical_model = Word2Vec.load(n2v_model_name)
     w2v_medical_model = Word2Vec.load(w2v_model_name)
-    n2v_embeddings_to_cluster = [n2v_medical_model[word] for word in dict_lemmas_full.keys()]
-    w2v_embeddings_to_cluster = [w2v_medical_model[word] for word in dict_lemmas_full.keys()]
-    n2v_transformed_embeddings = TSNE(n_components=2, perplexity=8).fit_transform(n2v_embeddings_to_cluster)
-    w2v_transformed_embeddings = TSNE(n_components=2, perplexity=8).fit_transform(w2v_embeddings_to_cluster)
-    for i, similar_lemma in enumerate(dict_lemmas_full.keys()):
+    n2v_embeddings_to_cluster = [n2v_medical_model[word] for word in lemmas_list]
+    w2v_embeddings_to_cluster = [w2v_medical_model[word] for word in lemmas_list]
+    chunks_1 = chunks(n2v_embeddings_to_cluster, 20)[3]
+    chunks_2 = chunks(w2v_embeddings_to_cluster, 20)[3]
+    chunk_lemmas = chunks(lemmas_list, 20)[3]
+    n2v_transformed_embeddings = TSNE(n_components=2, perplexity=8).fit_transform(chunks_1)
+    w2v_transformed_embeddings = TSNE(n_components=2, perplexity=8).fit_transform(chunks_2)
+    for i, similar_lemma in enumerate(chunk_lemmas):
         pyplot.annotate(similar_lemma, xy=(n2v_transformed_embeddings[i, 0], n2v_transformed_embeddings[i, 1]))
         pyplot.annotate(similar_lemma, xy=(w2v_transformed_embeddings[i, 0], w2v_transformed_embeddings[i, 1]))
     n2v = pyplot.scatter(n2v_transformed_embeddings[:, 0], n2v_transformed_embeddings[:, 1], color='r')
     w2v = pyplot.scatter(w2v_transformed_embeddings[:, 0], w2v_transformed_embeddings[:, 1], color='b')
     pyplot.legend((n2v, w2v), ('Node2Vec', 'Word2Vec'))
     pyplot.show()
+
+
+def chunks(lst, n):
+    return [lst[i:i + n] for i in range(0, len(lst), n)]

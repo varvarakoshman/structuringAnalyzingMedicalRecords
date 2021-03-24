@@ -3,13 +3,14 @@ from queue import LifoQueue
 
 
 class Node:
-    def __init__(self, id, lemma=None, form=None, sent_name=None, is_included=False, res_class=None):
+    def __init__(self, id, lemma=None, form=None, sent_name=None, pos_tag=None, pos_extended=None, is_included=False):
         self.id = id
         self.lemma = lemma
         self.form = form
         self.sent_name = sent_name
+        self.pos_tag = pos_tag
+        self.pos_extended = pos_extended
         self.is_included = is_included
-        self.res_class = res_class
 
 
 class Edge:
@@ -40,7 +41,9 @@ class Tree:
         new_node = Node(id=id_count,
                         form=existing_node.form,
                         sent_name=existing_node.sent_name,
-                        is_included=existing_node.is_included)
+                        is_included=existing_node.is_included,
+                        pos_tag=existing_node.pos_tag,
+                        pos_extended=existing_node.pos_extended)
         return new_node
 
     def set_help_dict(self):
@@ -100,8 +103,8 @@ class Tree:
                           child in children}
         return children_nodes
 
-    def create_new_node(self, new_id, lemma, form, sent, weight, from_id):
-        new_node = Node(new_id, lemma, form, sent)
+    def create_new_node(self, new_id, lemma, form, sent, pos_tag, pos_extended, weight, from_id):
+        new_node = Node(new_id, lemma, form, sent, pos_tag, pos_extended)
         Tree.add_node(self, new_node)
         new_edge = Edge(from_id, new_id, weight)
         Tree.add_edge(self, new_edge)
@@ -144,17 +147,14 @@ class Tree:
                     prev = curr
                     stack.get()
 
-    def simple_dfs(self, vertex, subtree_vertices):
-        sequence = []
+    def simple_dfs(self, root_id, subtree_vertices):
+        node_sequence = []
         parents_dict = {}
-        vertex_label_tuple_dict = {}
-        node = self.get_node(vertex)
+        node = self.get_node(root_id)
         if node is not None:
-            root_tuple = tuple([vertex, node.lemma, node.form, node.sent_name, self.get_edge(vertex)[0].weight])
-            sequence.append(root_tuple)
-            vertex_label_tuple_dict[vertex] = root_tuple
+            node_sequence.append(node)
             visited = []
-            stack = [vertex]
+            stack = [root_id]
             while len(stack) > 0:
                 curr = stack[-1]
                 if curr not in visited:
@@ -170,13 +170,10 @@ class Tree:
                             stack.append(child)
                             parents_dict[child] = curr
                             node = self.get_node(child)
-                            vertex_tuple = tuple(
-                                [child, node.lemma, node.form, node.sent_name, self.get_edge(child)[0].weight])
-                            vertex_label_tuple_dict[child] = vertex_tuple
-                            sequence.append(vertex_tuple)
+                            node_sequence.append(node)
                     if all_visited_flag:
                         stack.pop()
-        return sequence
+        return node_sequence
 
     def dfs_subtree(self, vertex, subtree_vertices):
         sequence = []
