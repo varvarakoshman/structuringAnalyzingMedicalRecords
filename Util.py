@@ -54,6 +54,29 @@ def read_med_data():
     return diseases, symptoms, docs, drugs
 
 
+# 'Болезнь' - 0, 'Симптом' - 1, 'Врач' - 2, 'Лекарство' - 3, 'Временная метка' - 4
+def label_lemmas(lemmas_list):
+    diseases, symptoms, docs, drugs = read_med_data()
+    times = ['#месяц', '#времясуток', '#сезон'] + time_labels
+    lemmas_labels = {}
+    for lemma in lemmas_list:
+        if lemma in diseases:
+            label = 0
+        elif lemma in symptoms:
+            label = 1
+        elif lemma in docs:
+            label = 2
+        elif lemma in drugs:
+            label = 3
+        elif lemma in times:
+            label = 4
+        else:
+            label = -1
+        if label != -1:
+            lemmas_labels[lemma] = label
+    return lemmas_labels
+
+
 def label_classes(classes_words, classes_count_passive_verbs):
     diseases, symptoms, docs, drugs = read_med_data()
     labels = ['Болезнь', 'Симптом', 'Врач', 'Лекарство', 'Событие', 'Временная метка']
@@ -331,6 +354,16 @@ def get_joint_lemmas(path1, path2):
     joint_lemmas = set(lemmas1).intersection(set(lemmas2))
     cleared_lemmas = list(filter(lambda lemma: lemma != '.', list(map(lambda lemma: lemma.split('\n')[0], joint_lemmas))))
     return cleared_lemmas
+
+
+def write_dict_in_file(similar_lemmas_dict_filtered):
+    filename = "medicalTextTrees/n2v_similar_words.txt"
+    try:
+        with open(filename, 'w', encoding='utf-8') as filehandle:
+            for word, similar_words in similar_lemmas_dict_filtered.items():
+                filehandle.write("%s : %s\n" % (word, tuple(similar_words)))
+    finally:
+        filehandle.close()
 
 # def write_tree_in_table(whole_tree, dict_rel_rev, labels):
 #     source_1 = 'medicalTextTrees/gephi_edges_import_word2vec.csv'

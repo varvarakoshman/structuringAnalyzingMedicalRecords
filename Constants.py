@@ -29,7 +29,7 @@ ALGO_RESULT_N2V_FILT = "medicalTextTrees/algo_results_filtered/merged_extended_n
 UPPER_BOUND_ADDITIONAL_DATA = 50000
 HIGH_COSINE_DIST = 0.8
 LOAD_TRAINED = True
-RUN_WITH_W2V = False
+RUN_WITH_W2V = True
 WRITE_IN_FILES = True
 
 # Additional constants

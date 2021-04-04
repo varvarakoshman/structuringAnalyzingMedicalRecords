@@ -560,9 +560,10 @@ def main():
     # create_needed_directories()
     # sort_the_data()
     # pick_new_sentences()
+
     # draw_histogram()
+
     lemmas_list = get_joint_lemmas('medicalTextTrees/all_lemmas_n2v.txt', 'medicalTextTrees/all_lemmas_w2v.txt')
-    visualize_embeddings(lemmas_list, "trained_node2vec.model", "trained.model")
     start = time.time()
     # trees_df_filtered, test_df = read_data() # TEST
     trees_df_filtered = read_data()
@@ -591,7 +592,7 @@ def main():
     #                     enumerate(dict.fromkeys(trees_full_df['lemma'].to_list()), 1)}
     # dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(long_df['deprel'].to_list()))}
     # dict_rel_rev = {v: k for k, v in dict_rel.items()}
-
+    visualize_embeddings(dict_lemmas_full, "trained_node2vec.model", "trained.model")
     if RUN_WITH_W2V:
         start = time.time()
         if LOAD_TRAINED:

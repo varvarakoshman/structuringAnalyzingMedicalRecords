@@ -8,6 +8,8 @@ import pandas as pd
 from stellargraph import StellarDiGraph
 from stellargraph.data import BiasedRandomWalk
 
+from Util import write_dict_in_file, label_lemmas
+
 pattern = re.compile('^#.+$')
 
 
@@ -81,27 +83,63 @@ def load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, model_name):
     for k, v in similar_lemmas_dict.items():
         stable = set(list(dict.fromkeys(v))) - most_freq
         similar_lemmas_dict_filtered[k] = list(stable)[:5]
+    similar_lemmas_dict_filtered = dict(sorted({k : v for k, v in similar_lemmas_dict_filtered.items() if len(v) > 0}.items()))
+    write_dict_in_file(similar_lemmas_dict_filtered)
     for lemma, similar_lemmas in similar_lemmas_dict_filtered.items():
         for similar_lemma in similar_lemmas:
             dict_lemmas_full[lemma].append(dict_lemmas_full[similar_lemma][0])
 
 
+def get_embeddings(data_dict, model1, model2):
+    n2v_embeddings_to_cluster = [model1[word] for word in data_dict.keys()]
+    w2v_embeddings_to_cluster = [model2[word] for word in data_dict.keys()]
+    n2v_transformed_embeddings = TSNE(n_components=2, perplexity=8).fit_transform(n2v_embeddings_to_cluster)
+    w2v_transformed_embeddings = TSNE(n_components=2, perplexity=8).fit_transform(w2v_embeddings_to_cluster)
+    return n2v_transformed_embeddings, w2v_transformed_embeddings
+
+
 def visualize_embeddings(lemmas_list, n2v_model_name, w2v_model_name):
     n2v_medical_model = Word2Vec.load(n2v_model_name)
     w2v_medical_model = Word2Vec.load(w2v_model_name)
-    n2v_embeddings_to_cluster = [n2v_medical_model[word] for word in lemmas_list]
-    w2v_embeddings_to_cluster = [w2v_medical_model[word] for word in lemmas_list]
-    chunks_1 = chunks(n2v_embeddings_to_cluster, 20)[3]
-    chunks_2 = chunks(w2v_embeddings_to_cluster, 20)[3]
-    chunk_lemmas = chunks(lemmas_list, 20)[3]
-    n2v_transformed_embeddings = TSNE(n_components=2, perplexity=8).fit_transform(chunks_1)
-    w2v_transformed_embeddings = TSNE(n_components=2, perplexity=8).fit_transform(chunks_2)
-    for i, similar_lemma in enumerate(chunk_lemmas):
-        pyplot.annotate(similar_lemma, xy=(n2v_transformed_embeddings[i, 0], n2v_transformed_embeddings[i, 1]))
-        pyplot.annotate(similar_lemma, xy=(w2v_transformed_embeddings[i, 0], w2v_transformed_embeddings[i, 1]))
-    n2v = pyplot.scatter(n2v_transformed_embeddings[:, 0], n2v_transformed_embeddings[:, 1], color='r')
-    w2v = pyplot.scatter(w2v_transformed_embeddings[:, 0], w2v_transformed_embeddings[:, 1], color='b')
-    pyplot.legend((n2v, w2v), ('Node2Vec', 'Word2Vec'))
+    labeled_lemmas = label_lemmas(lemmas_list.keys())
+    diseases = {k: v for k, v in labeled_lemmas.items() if v == 0}
+    symptoms = {k: v for k, v in labeled_lemmas.items() if v == 1}
+    docs = {k: v for k, v in labeled_lemmas.items() if v == 2}
+    drugs = {k: v for k, v in labeled_lemmas.items() if v == 3}
+    times = {k: v for k, v in labeled_lemmas.items() if v == 4}
+    # diseases
+    n2v_embeddings_disease, w2v_embeddings_disease = get_embeddings(diseases, n2v_medical_model, w2v_medical_model)
+    # symptoms
+    n2v_embeddings_symptoms, w2v_embeddings_symptoms = get_embeddings(symptoms, n2v_medical_model, w2v_medical_model)
+    # docs
+    n2v_embeddings_docs, w2v_embeddings_docs = get_embeddings(docs, n2v_medical_model, w2v_medical_model)
+    # drugs
+    n2v_embeddings_drugs, w2v_embeddings_drugs = get_embeddings(drugs, n2v_medical_model, w2v_medical_model)
+    # times
+    n2v_embeddings_times, w2v_embeddings_times = get_embeddings(times, n2v_medical_model, w2v_medical_model)
+
+    # chunks_1 = chunks(n2v_embeddings_to_cluster, 20)[7]
+    # chunks_2 = chunks(w2v_embeddings_to_cluster, 20)[7]
+    # chunk_lemmas = chunks(lemmas_list, 20)[7]
+    # n2v_transformed_embeddings = TSNE(n_components=2, perplexity=8).fit_transform(chunks_1)
+    # w2v_transformed_embeddings = TSNE(n_components=2, perplexity=8).fit_transform(chunks_2)
+    # for i, similar_lemma in enumerate(chunk_lemmas):
+    # for i, similar_lemma in enumerate(lemmas_list):
+    #     pyplot.annotate(similar_lemma, xy=(n2v_transformed_embeddings[i, 0], n2v_transformed_embeddings[i, 1]))
+    #     pyplot.annotate(similar_lemma, xy=(w2v_transformed_embeddings[i, 0], w2v_transformed_embeddings[i, 1]))
+
+    n2v_dis = pyplot.scatter(n2v_embeddings_disease[:, 0], n2v_embeddings_disease[:, 1], color='r', marker="*")
+    w2v_dis = pyplot.scatter(w2v_embeddings_disease[:, 0], w2v_embeddings_disease[:, 1], color='r', marker="x")
+    n2v_sym = pyplot.scatter(n2v_embeddings_symptoms[:, 0], n2v_embeddings_symptoms[:, 1], color='b', marker="*")
+    w2v_sym = pyplot.scatter(w2v_embeddings_symptoms[:, 0], w2v_embeddings_symptoms[:, 1], color='b', marker="x")
+    n2v_docs = pyplot.scatter(n2v_embeddings_docs[:, 0], n2v_embeddings_docs[:, 1], color='g', marker="*")
+    w2v_docs = pyplot.scatter(w2v_embeddings_docs[:, 0], w2v_embeddings_docs[:, 1], color='g', marker="x")
+    n2v_drgs = pyplot.scatter(n2v_embeddings_drugs[:, 0], n2v_embeddings_drugs[:, 1], color='y', marker="*")
+    w2v_drgs = pyplot.scatter(w2v_embeddings_drugs[:, 0], w2v_embeddings_drugs[:, 1], color='y', marker="x")
+    n2v_time = pyplot.scatter(n2v_embeddings_times[:, 0], n2v_embeddings_times[:, 1], color='c', marker="*")
+    w2v_time = pyplot.scatter(w2v_embeddings_times[:, 0], w2v_embeddings_times[:, 1], color='c', marker="x")
+
+    pyplot.legend(((n2v_dis, w2v_dis), (n2v_sym, w2v_sym), (n2v_docs, w2v_docs), (n2v_drgs, w2v_drgs), (n2v_time, w2v_time)), ('Болезнь', 'Симптом', 'Врач', 'Лекарство', 'Временная метка'))
     pyplot.show()
 
 
