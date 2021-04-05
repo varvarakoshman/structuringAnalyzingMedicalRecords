@@ -55,7 +55,7 @@ def read_data():
                     list_of_dfs = [this_df.iloc[boundaries[n]:boundaries[n + 1]] for n in range(len(boundaries) - 1)]
                     local_counter = 1
                     for df in list_of_dfs:
-                        df['sent_name'] = name + '_' + str(local_counter)
+                        df['sent_name'] = name + UNDERSCORE + str(local_counter)
                         # full_df.append(df)
                         stable_df.append(df)
                         local_counter += 1
@@ -80,10 +80,7 @@ def read_data():
             sent_history = []
             for df in dfs:
                 if list(df.form)[0] == list(df.form)[0]:
-                    try:
-                        sent_words = ' '.join(list(df.form))
-                    except TypeError as te:
-                        jjjj = []
+                    sent_words = SPACE.join(list(df.form))
                     # dfs_filtered.append(df)
                     if sent_words not in sent_history:
                         sent_history.append(sent_words)
@@ -98,7 +95,7 @@ def read_data():
             len_sent[len(words)] = [sent_n]
         else:
             len_sent[len(words)].append(sent_n)
-        sent = '_'.join(list(this_df.sent_name)[0].split('_')[:2])
+        sent = UNDERSCORE.join(list(this_df.sent_name)[0].split(UNDERSCORE)[:2])
         # file_name = '_'.join(file.split('.')[0].split('_')[:2])
         if sent not in unique_sents.keys():
             unique_sents[sent] = 1
@@ -138,9 +135,9 @@ def read_data():
 
     replaced_numbers = [k for k, v in trees_df_filtered.lemma.str.contains('#').to_dict().items() if v == True]
     for num in replaced_numbers:
-        trees_df_filtered.loc[num, 'upostag'] = 'Num'
+        trees_df_filtered.loc[num, 'upostag'] = 'M'
 
-    # target_sents = list({'44112_8', '38674_5', '55654_2', '35628_5'})
+    target_sents = list({'43829_4', '46581_0', '300424_0'})
     # target_sents = list({'44112_8', '55654_2', '32867_6', '57809_7'})  # TEST
     # target_sents = list({'55654_2', '35628_5', '32867_6', '57809_7', '57126_7'})  # TEST
     # target_sents = list({'93475_10_0', '106014_10', '128080_6', '162141_8', '56964_3', '56661_2', '37462_5', '34118_3', '152369_9', '41999_1', '263735_1', '281575_1'})  # TEST
@@ -156,7 +153,7 @@ def read_data():
     # target_sents = list({'53718_0', '46007_0', '56109_2', '41184_0'}) # test for plain
     # target_sents = list({'167529_9', '152369_9', '172030_9', '172030_23', '48408_0'}) # meeeeeess
 
-    # test_df = trees_df_filtered.loc[trees_df_filtered.sent_name.isin(target_sents)] # TEST
+    test_df = trees_df_filtered.loc[trees_df_filtered.sent_name.isin(target_sents)] # TEST
     # trees_full_df.loc[trees_full_df.index.isin(replaced_numbers)].assign(upostag = 'N')
 
     # trees_df_filtered = trees_df_filtered.head(513)

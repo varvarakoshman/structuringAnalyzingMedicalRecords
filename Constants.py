@@ -36,4 +36,5 @@ WRITE_IN_FILES = True
 EMPTY_STR = ""
 DOT = "."
 SPACE = " "
+UNDERSCORE = '_'
 NEW_LINE = "\n"

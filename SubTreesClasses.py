@@ -41,10 +41,7 @@ def construct_tree(trees_df_filtered, dict_lemmas, dict_rel, remapped_sent):
             pos_extended = row['feats']
             form = row['form']
             # create main node
-            try:
-                curr_lemma = curr_lemmas[0]
-            except TypeError as te:
-                ggg = []
+            curr_lemma = curr_lemmas[0]
             whole_tree.create_new_node(main_id, curr_lemma, form, sent, pos_tag, pos_extended, weight, from_id)
             children = [main_id]
             edge_to_weight[main_id] = weight
@@ -133,34 +130,39 @@ def add_additional_children_to_parents(k_2, whole_tree, all_parents):
     return additional_child_nodes
 
 
-def produce_combinations(k_2, v_id, str_sequence_help, equal_nodes, equal_nodes_mapping):
-    if len(equal_nodes) > 0:
-        list_for_combinations = set()
-        prepared_k_2 = set()
-        included_labels = []
-        for child_tree in k_2[v_id]:
-            if child_tree in [item for sublist in list(equal_nodes.values()) for item in
-                              sublist] or child_tree in equal_nodes.keys():
-                if child_tree in equal_nodes_mapping.keys():
-                    actual_label = equal_nodes_mapping[child_tree]
-                else:
-                    actual_label = child_tree
-                if actual_label not in included_labels:
-                    if actual_label in equal_nodes.keys():
-                        list_for_combinations.add(tuple(equal_nodes[actual_label]))
-                    else:
-                        list_for_combinations.add(tuple(equal_nodes[child_tree]))
-                    included_labels.append(actual_label)
+def get_comb_last_and_children(equal_nodes, equal_nodes_mapping, children_trees):
+    list_for_combinations = set()
+    prepared_k_2 = set()
+    included_labels = []
+    for child_tree in children_trees:
+        if child_tree in [item for sublist in list(equal_nodes.values()) for item in
+                          sublist] or child_tree in equal_nodes.keys():
+            if child_tree in equal_nodes_mapping.keys():
+                actual_label = equal_nodes_mapping[child_tree]
             else:
-                prepared_k_2.add(child_tree)
+                actual_label = child_tree
+            if actual_label not in included_labels:
+                if actual_label in equal_nodes.keys():
+                    list_for_combinations.add(tuple(equal_nodes[actual_label]))
+                else:
+                    list_for_combinations.add(tuple(equal_nodes[child_tree]))
+                included_labels.append(actual_label)
+        else:
+            prepared_k_2.add(child_tree)
+        return list_for_combinations, prepared_k_2
+
+
+def produce_combinations(k_2, v_id, str_sequence_help, equal_nodes, equal_nodes_mapping, max_n_2):
+    if len(equal_nodes) > 0:
+        list_for_combinations, prepared_k_2 = get_comb_last_and_children(equal_nodes, equal_nodes_mapping, k_2[v_id])
         combinations_repeated = list(product(*(list_for_combinations)))
         all_combinations = []
         for l in combinations_repeated:
             if len(prepared_k_2) > 0:
                 merged = list(l) + list(prepared_k_2)
-                all_combinations.extend(list(combinations(merged, i)) for i in range(1, len(merged) + 1))
+                all_combinations.extend(list(combinations(merged, i)) for i in range(1, max_n_2 + 1))
             else:
-                all_combinations.extend(list(combinations(list(l), i)) for i in range(1, len(list(l)) + 1))
+                all_combinations.extend(list(combinations(list(l), i)) for i in range(1, max_n_2 + 1))
     else:
         list_for_combinations = k_2[v_id]
         all_combinations = [list(combinations(list_for_combinations, i)) for i in
@@ -400,10 +402,30 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
                 combination_ids = {}
                 str_sequence_help = {}
                 duplicate_combs = {}  # for several cases
-                # generate combinations
+                equal_nodes_temp = {}
+                num_addit_nodes = {}
+                max_n_1 = 0
+                max_n_2 = 0  # no need to compute combinations for the longest children list full len
                 for v_id in ids:
                     equal_nodes = collect_equal_nodes(whole_tree, v_id, old_node_new_nodes, equal_nodes_mapping)
-                    all_combinations_str_joined = produce_combinations(k_2, v_id, str_sequence_help, equal_nodes, equal_nodes_mapping)
+                    equal_nodes_temp[v_id] = equal_nodes.copy()
+                    additional_nodes = set([val for values in equal_nodes.values() for val in values]) - set(equal_nodes.keys())
+                    num_addit_nodes[v_id] = len(additional_nodes)
+                    curr_n = len(k_2[v_id] - additional_nodes)
+                    if curr_n > max_n_1:
+                        max_n_2 = max_n_1
+                        max_n_1 = curr_n
+                equal_nodes_temp_sorted = {k: equal_nodes_temp[k] for k, _ in sorted(num_addit_nodes.items(), key=lambda item: item[1])}
+                # generate combinations
+                count = 0
+                for v_id, eq_nodes in equal_nodes_temp_sorted.items():
+                    count += 1
+                    if count == len(equal_nodes_temp_sorted): # is latest is with max n of additional nodes
+                        all_combinations_str_joined = produce_combinations(k_2, v_id, str_sequence_help, eq_nodes,
+                                                                           equal_nodes_mapping, max_n_2)
+                    else:
+                        all_combinations_str_joined = produce_combinations(k_2, v_id, str_sequence_help, eq_nodes,
+                                                                           equal_nodes_mapping, max_n_2)
                     for label in all_combinations_str_joined:
                         if label in combination_ids.keys():
                             combination_ids[label].append(v_id)
@@ -563,7 +585,7 @@ def main():
 
     # draw_histogram()
 
-    lemmas_list = get_joint_lemmas('medicalTextTrees/all_lemmas_n2v.txt', 'medicalTextTrees/all_lemmas_w2v.txt')
+    # lemmas_list = get_joint_lemmas('medicalTextTrees/all_lemmas_n2v.txt', 'medicalTextTrees/all_lemmas_w2v.txt')
     start = time.time()
     # trees_df_filtered, test_df = read_data() # TEST
     trees_df_filtered = read_data()
@@ -592,7 +614,7 @@ def main():
     #                     enumerate(dict.fromkeys(trees_full_df['lemma'].to_list()), 1)}
     # dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(long_df['deprel'].to_list()))}
     # dict_rel_rev = {v: k for k, v in dict_rel.items()}
-    visualize_embeddings(dict_lemmas_full, "trained_node2vec.model", "trained.model")
+    # visualize_embeddings(dict_lemmas_full, "trained_node2vec.model", "trained.model")
     if RUN_WITH_W2V:
         start = time.time()
         if LOAD_TRAINED:
@@ -652,11 +674,12 @@ def main():
     classes_words, classes_count_passive_verbs = get_all_words(meaningful_classes, dict_form_lemma)
     class_labels = label_classes(classes_words, classes_count_passive_verbs)
 
-    # group classes by assigned labels
-    grouped_classes_by_label = defaultdict(list)
-    for key, value in sorted(class_labels.items()):
-        grouped_classes_by_label[value].append(key)
-    # group_and_log()
+    # # group classes by assigned labels
+    # grouped_classes_by_label = defaultdict(list)
+    # for key, values in sorted(class_labels.items()):
+    #     for value in values:
+    #         grouped_classes_by_label[value].append(key)
+
     if WRITE_IN_FILES:
         # meaningful
         write_classes_in_txt(whole_tree, meaningful_classes, classes_sents_filtered, dict_rel_rev, class_labels, RESULT_PATH)

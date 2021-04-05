@@ -97,18 +97,19 @@ def label_classes(classes_words, classes_count_passive_verbs):
                 freqs[drg] += 1
             elif lemma in times:
                 freqs[time] += 1
-        if all(value == 0 for value in freqs.values()):
-            freqs[event] = classes_count_passive_verbs[class_id]
+        # if all(value == 0 for value in freqs.values()):
+        #     freqs[event] = classes_count_passive_verbs[class_id]
         sorted_d = dict(sorted(freqs.items(), key=lambda x: x[1], reverse=True))
+        max_count = max(sorted_d.values())
+        max_labels = [k for k, v in sorted_d.items() if v == max_count]
         if max(sorted_d.values()) > 0:
-            possible_label = next(iter(sorted_d))
+            possible_labels = max_labels
         else:
-            possible_label = EMPTY_STR
-        class_labels[class_id] = possible_label
+            possible_labels = []
+        if class_id in classes_count_passive_verbs.keys() and classes_count_passive_verbs[class_id] > 0:
+            possible_labels.append(classes_count_passive_verbs[class_id])
+        class_labels[class_id] = possible_labels
     return class_labels
-
-
-# def group_and_log()
 
 
 # POST-PROCESSING
@@ -199,19 +200,19 @@ def filter_classes(classes_part, classes_part_list, whole_tree, remapped_sent_re
 # filter long subsequences of prepositions
 def check1st(node_sequence):
     seq_pos_tags = list(map(lambda node: node.pos_tag, node_sequence))
-    target_indices = [index for index, pos_tag in enumerate(seq_pos_tags) if pos_tag == 'S']
+    target_indices = [index for index, pos_tag in enumerate(seq_pos_tags) if pos_tag == 'S' or pos_tag == 'C']
     if len(target_indices) > 0:
-        prep_max_len = 0
-        curr_len = 1
-        for i in range(0, len(target_indices) - 1):
-            if target_indices[i + 1] - target_indices[i] == 1:
-                curr_len += 1
-            else:
-                if curr_len > prep_max_len:
-                    prep_max_len = curr_len
-                curr_len = 1
-        if prep_max_len > len(seq_pos_tags) - prep_max_len:
-            return False # filter if a sequence of prepositions takes the most of a string
+        # prep_max_len = 0
+        # curr_len = 1
+        # for i in range(0, len(target_indices) - 1):
+        #     if target_indices[i + 1] - target_indices[i] == 1:
+        #         curr_len += 1
+        #     else:
+        #         curr_len = 1
+        #     if curr_len > prep_max_len:
+        #         prep_max_len = curr_len
+        if len(target_indices) > len(seq_pos_tags) - len(target_indices):
+            return False  # filter if a sequence of prepositions takes the most of a string
     return True
 
 
@@ -283,8 +284,8 @@ def write_classes_in_txt(whole_tree, meningful_classes, classes_sents_filtered, 
         filename = path + '/%s.txt' % (str(count))
         try:
             with open(filename, 'w', encoding='utf-8') as filehandle:
-                if class_labels: # empty dict comes for useless classes, which are also logged in file
-                    filehandle.write("label: %s\n" % (class_labels[class_id]))
+                if len(class_labels) > 0:  # empty dict comes for useless classes, which are also logged in file
+                    filehandle.write("label: %s\n" % (SPACE.join(str(i) for i in class_labels[class_id])))
                 for repeat_count, node_seq in enumerate(node_seq_list):
                     joined_res_str = SPACE.join(list(map(lambda node: '(' + str(dict_rel_rev[whole_tree.get_edge(node.id)[0].weight]) + ') ' + node.form + ' /' + node.pos_tag + '/ ', node_seq)))
                     filehandle.write("sent=%s: %s\n" % (classes_sents_filtered[class_id][repeat_count], joined_res_str))
