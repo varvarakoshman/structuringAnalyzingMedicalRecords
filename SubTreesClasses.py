@@ -152,7 +152,7 @@ def get_comb_last_and_children(equal_nodes, equal_nodes_mapping, children_trees)
         return list_for_combinations, prepared_k_2
 
 
-def produce_combinations(k_2, v_id, str_sequence_help, equal_nodes, equal_nodes_mapping, max_n_2):
+def produce_combinations(k_2, v_id, str_sequence_help, equal_nodes, equal_nodes_mapping):
     if len(equal_nodes) > 0:
         list_for_combinations, prepared_k_2 = get_comb_last_and_children(equal_nodes, equal_nodes_mapping, k_2[v_id])
         combinations_repeated = list(product(*(list_for_combinations)))
@@ -160,9 +160,9 @@ def produce_combinations(k_2, v_id, str_sequence_help, equal_nodes, equal_nodes_
         for l in combinations_repeated:
             if len(prepared_k_2) > 0:
                 merged = list(l) + list(prepared_k_2)
-                all_combinations.extend(list(combinations(merged, i)) for i in range(1, max_n_2 + 1))
+                all_combinations.extend(list(combinations(merged, i)) for i in range(1, len(merged) + 1))
             else:
-                all_combinations.extend(list(combinations(list(l), i)) for i in range(1, max_n_2 + 1))
+                all_combinations.extend(list(combinations(list(l), i)) for i in range(1, len(list(l)) + 1))
     else:
         list_for_combinations = k_2[v_id]
         all_combinations = [list(combinations(list_for_combinations, i)) for i in
@@ -207,8 +207,9 @@ def extend_equal_nodes_mapping(w, item_list, function, equal_nodes_mapping, actu
     return merge
 
 
-def collect_equal_nodes(whole_tree, v_id, old_node_new_nodes, equal_nodes_mapping):
+def collect_equal_nodes(whole_tree, v_id, old_node_new_nodes):
     equal_nodes = {}
+    equal_nodes_mapping = {}  # dict for storing {new subtree label: actual label (mapped)}
     function_lemma_getter = lambda node_id: str(whole_tree.get_node(node_id).lemma)
     function_identity = lambda lemma: str(lemma)
     # only for duplicating nodes
@@ -236,7 +237,7 @@ def collect_equal_nodes(whole_tree, v_id, old_node_new_nodes, equal_nodes_mappin
                 equal_nodes[actual_label] = merge
             else:
                 equal_nodes[actual_label].extend(merge)
-    return equal_nodes
+    return equal_nodes, equal_nodes_mapping
 
 
 def find_subtree_children(whole_tree, classes_similar_mapping, children, subtree, lemma_nodeid_dict):  # , equal_nodes_mapping)
@@ -364,7 +365,7 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
     classes_subtreeid_nodes_list = {}  # dict for storing nodes included in each repeat
     unique_subtrees_mapped_global_subtree_lemma = {}  # global dict for storing {hash of repeat: lemma_id} pairs
     old_node_new_nodes = {}  # dict for storing {old node id: [subtree's new label]} pairs
-    equal_nodes_mapping = {}  # dict for storing {new subtree label: actual label (mapped)}
+    # equal_nodes_mapping = {}  # dict for storing {new subtree label: actual label (mapped)}
     k_2 = {}  # dict for storing children labels for nodes: {parent node id: [children label (edge_to.weight + lemma)]}
     lemma_nodeid_dict = {}  # stores a set of node_ids for each lemma, needed for searching of target children of a subtree
     # additional dicts needed to track number of unique lemmas in a sentence for not adding a duplicate node
@@ -403,29 +404,31 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
                 str_sequence_help = {}
                 duplicate_combs = {}  # for several cases
                 equal_nodes_temp = {}
-                num_addit_nodes = {}
-                max_n_1 = 0
-                max_n_2 = 0  # no need to compute combinations for the longest children list full len
+                id_equal_nodes_mapping = {}
+                # num_addit_nodes = {}
+                # max_n_1 = 0
+                # max_n_2 = 0  # no need to compute combinations for the longest children list full len
                 for v_id in ids:
-                    equal_nodes = collect_equal_nodes(whole_tree, v_id, old_node_new_nodes, equal_nodes_mapping)
-                    equal_nodes_temp[v_id] = equal_nodes.copy()
-                    additional_nodes = set([val for values in equal_nodes.values() for val in values]) - set(equal_nodes.keys())
-                    num_addit_nodes[v_id] = len(additional_nodes)
-                    curr_n = len(k_2[v_id] - additional_nodes)
-                    if curr_n > max_n_1:
-                        max_n_2 = max_n_1
-                        max_n_1 = curr_n
-                equal_nodes_temp_sorted = {k: equal_nodes_temp[k] for k, _ in sorted(num_addit_nodes.items(), key=lambda item: item[1])}
+                    equal_nodes_temp[v_id], id_equal_nodes_mapping[v_id] = collect_equal_nodes(whole_tree, v_id, old_node_new_nodes)
+                    # equal_nodes_temp[v_id] = equal_nodes
+                    # additional_nodes = set([val for values in equal_nodes.values() for val in values]) - set(equal_nodes.keys())
+                    # num_addit_nodes[v_id] = len(additional_nodes)
+                    # curr_n = len(k_2[v_id] - additional_nodes)
+                    # if curr_n > max_n_1:
+                    #     max_n_2 = max_n_1
+                    #     max_n_1 = curr_n
+                # equal_nodes_temp_sorted = {k: equal_nodes_temp[k] for k, _ in sorted(num_addit_nodes.items(), key=lambda item: item[1])}
                 # generate combinations
-                count = 0
-                for v_id, eq_nodes in equal_nodes_temp_sorted.items():
-                    count += 1
-                    if count == len(equal_nodes_temp_sorted): # is latest is with max n of additional nodes
-                        all_combinations_str_joined = produce_combinations(k_2, v_id, str_sequence_help, eq_nodes,
-                                                                           equal_nodes_mapping, max_n_2)
-                    else:
-                        all_combinations_str_joined = produce_combinations(k_2, v_id, str_sequence_help, eq_nodes,
-                                                                           equal_nodes_mapping, max_n_2)
+                for v_id, eq_nodes in equal_nodes_temp.items():
+                    equal_nodes_mapping = id_equal_nodes_mapping[v_id]
+                    all_combinations_str_joined = produce_combinations(k_2, v_id, str_sequence_help, eq_nodes,
+                                                                       equal_nodes_mapping)
+                    # if count == len(equal_nodes_temp_sorted): # is latest is with max n of additional nodes
+                    #     all_combinations_str_joined = produce_combinations(k_2, v_id, str_sequence_help, eq_nodes,
+                    #                                                        equal_nodes_mapping, max_n_2)
+                    # else:
+                    #     all_combinations_str_joined = produce_combinations(k_2, v_id, str_sequence_help, eq_nodes,
+                    #                                                        equal_nodes_mapping, max_n_2)
                     for label in all_combinations_str_joined:
                         if label in combination_ids.keys():
                             combination_ids[label].append(v_id)
