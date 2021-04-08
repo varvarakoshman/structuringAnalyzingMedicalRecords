@@ -55,8 +55,8 @@ def train_node2vec(whole_tree_plain, dict_lemmas_rev):
         nodes=stellar_graph.nodes(),  # root nodes
         length=walk_length,  # maximum length of a random walk
         n=5,  # number of random walks per root node
-        p=3,  # Defines (unormalised) probability, 1/p, of returning to source node
-        q=7,  # Defines (unormalised) probability, 1/q, for moving away from source node
+        p=4,  # Defines (unormalised) probability, 1/p, of returning to source node
+        q=6,  # Defines (unormalised) probability, 1/q, for moving away from source node
         weighted=True,  # for weighted random walks
         seed=42,  # random seed fixed for reproducibility
     )
@@ -83,11 +83,11 @@ def load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, model_name):
                 else:
                     similar_lemmas_dict[lemma].append(similar_lemma)
     all_values = [item for sublist in similar_lemmas_dict.values() for item in sublist]
-    most_freq = set([i for i in all_values if all_values.count(i) > 11])
+    # most_freq = set([i for i in all_values if all_values.count(i) > 11])
     similar_lemmas_dict_filtered = {}
     for k, v in similar_lemmas_dict.items():
-        stable = set(list(dict.fromkeys(v))) - most_freq
-        similar_lemmas_dict_filtered[k] = list(stable)[:5]
+        stable = set(list(dict.fromkeys(v))) #- most_freq
+        similar_lemmas_dict_filtered[k] = list(stable)[:10]
     russian_stopwords = stopwords.words("russian")
     similar_lemmas_dict_filtered = dict(sorted({k: v for k, v in similar_lemmas_dict_filtered.items() if len(v) > 0 and not(k in russian_stopwords or english_letters.match(k) or special_chars.match(k))}.items()))
     # similar_lemmas_dict_filtered_2 = {} # join similar words

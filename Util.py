@@ -383,3 +383,42 @@ def write_dict_in_file(similar_lemmas_dict_filtered):
 #         for node in included_nodes:
 #             writer_2.writerow(
 #                 [node.id, (node.lemma, node.form, node.sent_name), node.res_class, labels[node.res_class]])
+
+
+def sort_already_logged(path):
+    try:
+        with open(path, 'r', encoding='windows-1251') as reader:
+            class_entries = reader.readlines()
+    finally:
+        reader.close()
+    count = 0
+    result_dict = {}
+    for line in class_entries:
+        if line != NEW_LINE:
+            if count not in result_dict.keys():
+                result_dict[count] = [line]
+            else:
+                result_dict[count].append(line)
+        else:
+            count += 1
+    result_dict_filtered = dict(sorted(result_dict.items(), key=lambda x: len(x[1]), reverse=True))
+    return result_dict_filtered
+
+
+def write_sorted_res_in_file(result_dict, path):
+    try:
+        with open(path, 'w', encoding='utf-8') as filehandle:
+            for class_values in result_dict.values():
+                for class_value in class_values:
+                    filehandle.write(class_value)
+                filehandle.write(NEW_LINE)
+    finally:
+        filehandle.close()
+
+
+def squash_classes(meaningful_classes_filtered, dict_lemmas_similar, dict_form_lemma_int):
+    class_id_repr = {}
+    for class_id, entries_list in meaningful_classes_filtered.items():
+        class_repres = tuple(list(sorted(set([dict_lemmas_similar[dict_form_lemma_int[entry.form]] for entries in entries_list for entry in entries]))))
+        class_id_repr[class_id] = class_repres
+    return None

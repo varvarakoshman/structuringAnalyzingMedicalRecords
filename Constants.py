@@ -26,8 +26,8 @@ ALGO_RESULT_W2V_FILT = "medicalTextTrees/algo_results_filtered/merged_extended_w
 ALGO_RESULT_N2V_FILT = "medicalTextTrees/algo_results_filtered/merged_extended_n2v.txt"
 
 # Word2vec training constants
-UPPER_BOUND_ADDITIONAL_DATA = 50000
-HIGH_COSINE_DIST = 0.8
+UPPER_BOUND_ADDITIONAL_DATA = 500000
+HIGH_COSINE_DIST = 0.75
 LOAD_TRAINED = True
 RUN_WITH_W2V = True
 WRITE_IN_FILES = True

@@ -9,7 +9,8 @@ from Preprocessing import read_data, replace_time_constructions
 from Tree import Tree, Node, Edge
 from Constants import *
 from Util import create_needed_directories, merge_in_file, filter_classes, write_tree_in_table, write_in_file_old, \
-    write_classes_in_txt, filter_meaningless_classes, get_all_words, label_classes, get_joint_lemmas
+    write_classes_in_txt, filter_meaningless_classes, get_all_words, label_classes, get_joint_lemmas, \
+    sort_already_logged, write_sorted_res_in_file, squash_classes
 from Visualisation import draw_histogram
 from W2Vprocessing import load_trained_word2vec, train_word2vec, train_node2vec, visualize_embeddings
 
@@ -589,6 +590,10 @@ def main():
     # draw_histogram()
 
     # lemmas_list = get_joint_lemmas('medicalTextTrees/all_lemmas_n2v.txt', 'medicalTextTrees/all_lemmas_w2v.txt')
+    dict1 = sort_already_logged('medicalTextTrees/merged_long.txt')
+    dict2 = sort_already_logged('medicalTextTrees/merged_wtf2.txt')
+    write_sorted_res_in_file(dict1, 'medicalTextTrees/merged_long_sorted.txt')
+    write_sorted_res_in_file(dict2, 'medicalTextTrees/merged_wtf2_sorted.txt')
     start = time.time()
     # trees_df_filtered, test_df = read_data() # TEST
     trees_df_filtered = read_data()
@@ -612,7 +617,8 @@ def main():
     remapped_sent_rev = {index: sent_name for sent_name, index in remapped_sent.items()}
 
     # dict_lemmas = {lemma: [index] for index, lemma in enumerate(dict.fromkeys(long_df['lemma'].to_list()), 1)}
-    dict_form_lemma = dict(zip(trees_df_filtered['form'].to_list(), trees_df_filtered['lemma'].to_list()))
+    dict_form_lemma_str = dict(zip(trees_df_filtered['form'].to_list(), trees_df_filtered['lemma'].to_list()))
+    dict_form_lemma_int = {k: dict_lemmas_full[v][0] for k, v in dict_form_lemma_str.items()}
     # dict_lemmas_full = {lemma: [index] for index, lemma in
     #                     enumerate(dict.fromkeys(trees_full_df['lemma'].to_list()), 1)}
     # dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(long_df['deprel'].to_list()))}
@@ -660,8 +666,6 @@ def main():
     for node in whole_tree.nodes:
         if node.id not in whole_tree.heights.keys():
             whole_tree.heights[node.id] = whole_tree.heights[whole_tree.global_similar_mapping[node.id]]
-
-    # classes for partial repeats
     start = time.time()
     classes_part, classes_part_list, init_labels = compute_part_subtrees(whole_tree, dict_lemmas_size, grouped_heights)
     # write_tree_in_table(whole_tree)
@@ -672,11 +676,26 @@ def main():
     # print('Time on writing data old: ' + str(time.time() - start))
     # new
     start = time.time()
-    classes_wordgroups_filtered, classes_sents_filtered = filter_classes(classes_part, classes_part_list, whole_tree, remapped_sent_rev, dict_form_lemma)
-    meaningful_classes, meaningless_classes = filter_meaningless_classes(classes_wordgroups_filtered, dict_form_lemma)
-    classes_words, classes_count_passive_verbs = get_all_words(meaningful_classes, dict_form_lemma)
+    classes_wordgroups_filtered, classes_sents_filtered = filter_classes(classes_part, classes_part_list, whole_tree, remapped_sent_rev, dict_form_lemma_str)
+    meaningful_classes, meaningless_classes = filter_meaningless_classes(classes_wordgroups_filtered, dict_form_lemma_str)
+    classes_words, classes_count_passive_verbs = get_all_words(meaningful_classes, dict_form_lemma_str)
     class_labels = label_classes(classes_words, classes_count_passive_verbs)
+    meaningful_classes_filtered = dict(sorted(meaningful_classes.items(), key=lambda x: len(x[1]), reverse=True))
 
+    dict_lemmas_full_edit = {v[0]: set(v) for k, v in dict_lemmas_full.items()}
+    for lemma, sim_lemmas in dict_lemmas_full_edit.items():
+        for sim_lemma in sim_lemmas:
+            dict_lemmas_full_edit[sim_lemma].add(lemma)
+            # if lemma not in dict_lemmas_full_extended.keys():
+            #     dict_lemmas_full_extended[lemma] = dict_lemmas_full_edit[sim_lemma].copy()
+            # else:
+            #     dict_lemmas_full_extended[lemma].update(dict_lemmas_full_edit[sim_lemma])
+    dict_lemmas_full_extended_2 = {k: tuple(sorted(list(v))) for k, v in dict_lemmas_full_edit.items()}
+    res = defaultdict(list)
+    for key, val in sorted(dict_lemmas_full_extended_2.items()):
+        res[val].append(key)
+    # dict_lemmas_similar = {sim_lemma_id: sim_lemma_ids[0] for _, sim_lemma_ids in dict_lemmas_full.items() for sim_lemma_id in sim_lemma_ids}
+    squash_classes(meaningful_classes_filtered, dict_lemmas_full_extended_2, dict_form_lemma_int)
     # # group classes by assigned labels
     # grouped_classes_by_label = defaultdict(list)
     # for key, values in sorted(class_labels.items()):
@@ -685,7 +704,7 @@ def main():
 
     if WRITE_IN_FILES:
         # meaningful
-        write_classes_in_txt(whole_tree, meaningful_classes, classes_sents_filtered, dict_rel_rev, class_labels, RESULT_PATH)
+        write_classes_in_txt(whole_tree, meaningful_classes_filtered, classes_sents_filtered, dict_rel_rev, class_labels, RESULT_PATH)
         merge_in_file(RESULT_PATH, MERGED_PATH)
         # meaningless
         write_classes_in_txt(whole_tree, meaningless_classes, classes_sents_filtered, dict_rel_rev, {}, RESULT_PATH_FILTERED)
