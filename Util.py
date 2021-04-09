@@ -5,6 +5,7 @@
 import csv
 import os
 import re
+from collections import defaultdict
 
 import pandas as pd
 
@@ -278,17 +279,17 @@ def write_all_lemmas(all_lemmas):
         filehandle.close()
 
 
-def write_classes_in_txt(whole_tree, meningful_classes, classes_sents_filtered, dict_rel_rev, class_labels, path):
+def write_classes_in_txt(whole_tree, meningful_classes, classes_sents_filtered, new_classes_mapping, dict_rel_rev, class_labels, path):
     count = 1
     for class_id, node_seq_list in meningful_classes.items():
         filename = path + '/%s.txt' % (str(count))
         try:
             with open(filename, 'w', encoding='utf-8') as filehandle:
                 if len(class_labels) > 0:  # empty dict comes for useless classes, which are also logged in file
-                    filehandle.write("label: %s\n" % (SPACE.join(str(i) for i in class_labels[class_id])))
+                    filehandle.write("label: %s\n" % (SPACE.join(str(i) for i in class_labels[new_classes_mapping[class_id][0]])))
                 for repeat_count, node_seq in enumerate(node_seq_list):
                     joined_res_str = SPACE.join(list(map(lambda node: '(' + str(dict_rel_rev[whole_tree.get_edge(node.id)[0].weight]) + ') ' + node.form + ' /' + node.pos_tag + '/ ', node_seq)))
-                    filehandle.write("sent=%s: %s\n" % (classes_sents_filtered[class_id][repeat_count], joined_res_str))
+                    filehandle.write("sent=%s: %s\n" % ('some_sent', joined_res_str)) # WRONG!!!! SENT!!!!
         finally:
             filehandle.close()
         count += 1
@@ -416,9 +417,24 @@ def write_sorted_res_in_file(result_dict, path):
         filehandle.close()
 
 
-def squash_classes(meaningful_classes_filtered, dict_lemmas_similar, dict_form_lemma_int):
+def squash_classes(whole_tree, meaningful_classes_filtered, dict_lemmas_similar, dict_form_lemma_int):
     class_id_repr = {}
     for class_id, entries_list in meaningful_classes_filtered.items():
-        class_repres = tuple(list(sorted(set([dict_lemmas_similar[dict_form_lemma_int[entry.form]] for entries in entries_list for entry in entries]))))
-        class_id_repr[class_id] = class_repres
-    return None
+        class_weights = list(sorted([whole_tree.get_edge(entries_list[0][i].id)[0].weight for i in range(1, len(entries_list[0]))]))
+        class_lemmas = list(sorted(set([dict_lemmas_similar[dict_form_lemma_int[entry.form]] for entries in entries_list for entry in entries])))
+        class_id_repr[class_id] = tuple(class_lemmas + class_weights)
+    grouped_classes = defaultdict(list)
+    for key, val in sorted(class_id_repr.items()):
+        grouped_classes[val].append(key)
+    meaningful_classes_filtered_squashed = {}
+    new_classes_mapping = {}
+    count = 1
+    for classes_group in grouped_classes.values():
+        merged_class = meaningful_classes_filtered[classes_group[0]]
+        new_classes_mapping[count] = [classes_group[0]]
+        for i in range(1, len(classes_group)):
+            new_classes_mapping[count].append(classes_group[i])
+            merged_class = merged_class + meaningful_classes_filtered[classes_group[i]]
+        meaningful_classes_filtered_squashed[count] = merged_class
+        count += 1
+    return meaningful_classes_filtered_squashed, new_classes_mapping

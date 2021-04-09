@@ -684,8 +684,10 @@ def main():
 
     dict_lemmas_full_edit = {v[0]: set(v) for k, v in dict_lemmas_full.items()}
     for lemma, sim_lemmas in dict_lemmas_full_edit.items():
+        new_temp = dict_lemmas_full_edit[lemma].copy()
         for sim_lemma in sim_lemmas:
-            dict_lemmas_full_edit[sim_lemma].add(lemma)
+            new_temp.update(dict_lemmas_full_edit[sim_lemma])
+        dict_lemmas_full_edit[lemma] = new_temp.copy()
             # if lemma not in dict_lemmas_full_extended.keys():
             #     dict_lemmas_full_extended[lemma] = dict_lemmas_full_edit[sim_lemma].copy()
             # else:
@@ -694,8 +696,10 @@ def main():
     res = defaultdict(list)
     for key, val in sorted(dict_lemmas_full_extended_2.items()):
         res[val].append(key)
+    new_labels = {v: k for k, v in enumerate(res.keys())}
+    dict_lemmas_full_new_labels = {k: new_labels[v] for k, v in dict_lemmas_full_extended_2.items()}
     # dict_lemmas_similar = {sim_lemma_id: sim_lemma_ids[0] for _, sim_lemma_ids in dict_lemmas_full.items() for sim_lemma_id in sim_lemma_ids}
-    squash_classes(meaningful_classes_filtered, dict_lemmas_full_extended_2, dict_form_lemma_int)
+    meaningful_classes_filtered_squashed, new_classes_mapping = squash_classes(whole_tree, meaningful_classes_filtered, dict_lemmas_full_new_labels, dict_form_lemma_int)
     # # group classes by assigned labels
     # grouped_classes_by_label = defaultdict(list)
     # for key, values in sorted(class_labels.items()):
@@ -704,10 +708,10 @@ def main():
 
     if WRITE_IN_FILES:
         # meaningful
-        write_classes_in_txt(whole_tree, meaningful_classes_filtered, classes_sents_filtered, dict_rel_rev, class_labels, RESULT_PATH)
+        write_classes_in_txt(whole_tree, meaningful_classes_filtered_squashed, classes_sents_filtered, new_classes_mapping, dict_rel_rev, class_labels, RESULT_PATH)
         merge_in_file(RESULT_PATH, MERGED_PATH)
         # meaningless
-        write_classes_in_txt(whole_tree, meaningless_classes, classes_sents_filtered, dict_rel_rev, {}, RESULT_PATH_FILTERED)
+        write_classes_in_txt(whole_tree, meaningless_classes, classes_sents_filtered, new_classes_mapping, dict_rel_rev, {}, RESULT_PATH_FILTERED)
         merge_in_file(RESULT_PATH_FILTERED, MERGED_PATH_FILTERED)
     print('Time on writing data new: ' + str(time.time() - start))
     gg = []
