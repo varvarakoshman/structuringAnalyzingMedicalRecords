@@ -120,7 +120,7 @@ def visualize_embeddings(lemmas_list, n2v_model_name, w2v_model_name):
     docs = {k: v for k, v in labeled_lemmas.items() if v == 2}
     drugs = {k: v for k, v in labeled_lemmas.items() if v == 3}
     times = {k: v for k, v in labeled_lemmas.items() if v == 4}
-    # diseases
+    # # diseases
     n2v_embeddings_disease, w2v_embeddings_disease = get_embeddings(diseases, n2v_medical_model, w2v_medical_model)
     # symptoms
     n2v_embeddings_symptoms, w2v_embeddings_symptoms = get_embeddings(symptoms, n2v_medical_model, w2v_medical_model)
@@ -128,6 +128,18 @@ def visualize_embeddings(lemmas_list, n2v_model_name, w2v_model_name):
     n2v_embeddings_docs, w2v_embeddings_docs = get_embeddings(docs, n2v_medical_model, w2v_medical_model)
     # drugs
     n2v_embeddings_drugs, w2v_embeddings_drugs = get_embeddings(drugs, n2v_medical_model, w2v_medical_model)
+    drugs_X = n2v_embeddings_drugs[:, 0]
+    drugs_Y = n2v_embeddings_drugs[:, 1]
+    drugs_annotations = list(drugs.keys())
+    dis_X = n2v_embeddings_disease[:, 0]
+    dis_Y = n2v_embeddings_disease[:, 1]
+    dis_annotations = list(diseases.keys())
+    sym_X = n2v_embeddings_symptoms[:, 0]
+    sym_Y = n2v_embeddings_symptoms[:, 1]
+    sym_annotations = list(symptoms.keys())
+    docs_X = n2v_embeddings_docs[:, 0]
+    docs_Y = n2v_embeddings_docs[:, 1]
+    docs_annotations = list(docs.keys())
     # times
     n2v_embeddings_times, w2v_embeddings_times = get_embeddings(times, n2v_medical_model, w2v_medical_model)
 
@@ -140,24 +152,36 @@ def visualize_embeddings(lemmas_list, n2v_model_name, w2v_model_name):
     # for i, similar_lemma in enumerate(lemmas_list):
     #     pyplot.annotate(similar_lemma, xy=(n2v_transformed_embeddings[i, 0], n2v_transformed_embeddings[i, 1]))
     #     pyplot.annotate(similar_lemma, xy=(w2v_transformed_embeddings[i, 0], w2v_transformed_embeddings[i, 1]))
-    fig1, ax1 = pyplot.subplots()
-    w2v_dis = ax1.scatter(w2v_embeddings_disease[:, 0], w2v_embeddings_disease[:, 1], color='r', marker="*")
-    w2v_sym = ax1.scatter(w2v_embeddings_symptoms[:, 0], w2v_embeddings_symptoms[:, 1], color='b', marker="*")
-    w2v_docs = ax1.scatter(w2v_embeddings_docs[:, 0], w2v_embeddings_docs[:, 1], color='g', marker="*")
-    w2v_drgs = ax1.scatter(w2v_embeddings_drugs[:, 0], w2v_embeddings_drugs[:, 1], color='y', marker="*")
-    w2v_time = ax1.scatter(w2v_embeddings_times[:, 0], w2v_embeddings_times[:, 1], color='c', marker="*")
-    ax1.set_title("Word2Vec embeddings")
-    ax1.legend((w2v_dis, w2v_sym, w2v_docs, w2v_drgs, w2v_time),
-                  ('Болезнь', 'Симптом', 'Врач', 'Лекарство', 'Временная метка'))
+    # fig1, ax1 = pyplot.subplots()
+    # w2v_dis = ax1.scatter(w2v_embeddings_disease[:, 0], w2v_embeddings_disease[:, 1], color='r', marker="*")
+    # w2v_sym = ax1.scatter(w2v_embeddings_symptoms[:, 0], w2v_embeddings_symptoms[:, 1], color='b', marker="*")
+    # w2v_docs = ax1.scatter(w2v_embeddings_docs[:, 0], w2v_embeddings_docs[:, 1], color='g', marker="*")
+    # w2v_drgs = ax1.scatter(w2v_embeddings_drugs[:, 0], w2v_embeddings_drugs[:, 1], color='y', marker="*")
+    # for i, label in enumerate(drugs_annotations):
+    #     ax1.annotate(label, (drugs_X[i], drugs_Y[i]))
+    # w2v_time = ax1.scatter(w2v_embeddings_times[:, 0], w2v_embeddings_times[:, 1], color='c', marker="*")
+    # ax1.set_title("Word2Vec embeddings")
+    # ax1.legend((w2v_dis, w2v_sym, w2v_docs, w2v_drgs, w2v_time),
+    #               ('Болезнь', 'Симптом', 'Врач', 'Лекарство', 'Временная метка'))
+    # ax1.legend((w2v_drgs),'Лекарство')
 
     fig1, ax2 = pyplot.subplots()
-    n2v_dis = ax2.scatter(n2v_embeddings_disease[:, 0], n2v_embeddings_disease[:, 1], color='r', marker="*")
-    n2v_sym = ax2.scatter(n2v_embeddings_symptoms[:, 0], n2v_embeddings_symptoms[:, 1], color='b', marker="*")
-    n2v_docs = ax2.scatter(n2v_embeddings_docs[:, 0], n2v_embeddings_docs[:, 1], color='g', marker="*")
-    n2v_drgs = ax2.scatter(n2v_embeddings_drugs[:, 0], n2v_embeddings_drugs[:, 1], color='y', marker="*")
-    n2v_time = ax2.scatter(n2v_embeddings_times[:, 0], n2v_embeddings_times[:, 1], color='c', marker="*")
+    n2v_dis = ax2.scatter(dis_X, dis_Y, color='r', marker="*", s=50)
+    n2v_sym = ax2.scatter(sym_X, sym_Y, color='b', marker="*", s=50)
+    n2v_docs = ax2.scatter(docs_X, docs_Y, color='g', marker="*", s=50)
+    n2v_drgs = ax2.scatter(drugs_X, drugs_Y, color='y', marker="*", s=50)
+    # for i, label in enumerate(drugs_annotations):
+    #     ax2.annotate(label, (drugs_X[i], drugs_Y[i]), fontsize=6)
+    # for i, label in enumerate(dis_annotations):
+    #     ax2.annotate(label, (dis_X[i], dis_Y[i]), fontsize=6)
+    # for i, label in enumerate(sym_annotations):
+    #     ax2.annotate(label, (sym_X[i], sym_Y[i]), fontsize=6)
+    # for i, label in enumerate(docs_annotations):
+    #     ax2.annotate(label, (docs_X[i], docs_Y[i]), fontsize=6)
+    n2v_time = ax2.scatter(n2v_embeddings_times[:, 0], n2v_embeddings_times[:, 1], color='c', marker="*", s=40)
     ax2.legend((n2v_dis, n2v_sym, n2v_docs, n2v_drgs, n2v_time),
                   ('Болезнь', 'Симптом', 'Врач', 'Лекарство', 'Временная метка'))
+    # ax2.legend((n2v_drgs),'Лекарство')
     ax2.set_title("Node2Vec embeddings")
     pyplot.show()
 

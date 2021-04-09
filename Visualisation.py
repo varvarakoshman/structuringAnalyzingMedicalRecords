@@ -159,11 +159,11 @@ def draw_histogram():
     ax = plt.axes()
     ax.set_xticks(pos)
     ax.set_xticklabels(frequencies)
-    ax.set_xlabel('Размер класса')
+    ax.set_xlabel('Число повторов в классе')
     ax.set_ylabel('Число классов')
     plt.xticks(rotation=45)
     plt.bar(pos, alphab, width=0.9, color='b')
-    plt.title('Число классов с равным числом повторов')
+    # plt.title('Число классов с равным числом повторов')
     plt.show()
 
     res_len = dict(sorted(res_len.items(), key=lambda x: x[0]))
@@ -174,10 +174,10 @@ def draw_histogram():
     ax1 = plt.axes()
     ax1.set_xticks(pos1)
     ax1.set_xticklabels(frequencies)
-    ax1.set_xlabel('Объем класса')
+    ax1.set_xlabel('Число слов в повторе')
     ax1.set_ylabel('Число классов')
     plt.bar(pos1, alphab, width=0.4, color='b')
-    plt.title('Число классов с равным числом слов в повторе')
+    # plt.title('Число классов с равным числом слов в повторе')
     plt.show()
 
 

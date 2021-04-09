@@ -9,7 +9,7 @@ from Preprocessing import read_data, replace_time_constructions
 from Tree import Tree, Node, Edge
 from Constants import *
 from Util import create_needed_directories, merge_in_file, filter_classes, write_tree_in_table, write_in_file_old, \
-    write_classes_in_txt, filter_meaningless_classes, get_all_words, label_classes, get_joint_lemmas
+    write_classes_in_txt, filter_meaningless_classes, get_all_words, label_classes, get_joint_lemmas, squash_classes
 from Visualisation import draw_histogram
 from W2Vprocessing import load_trained_word2vec, train_word2vec, train_node2vec, visualize_embeddings
 
@@ -130,39 +130,34 @@ def add_additional_children_to_parents(k_2, whole_tree, all_parents):
     return additional_child_nodes
 
 
-def get_comb_last_and_children(equal_nodes, equal_nodes_mapping, children_trees):
-    list_for_combinations = set()
-    prepared_k_2 = set()
-    included_labels = []
-    for child_tree in children_trees:
-        if child_tree in [item for sublist in list(equal_nodes.values()) for item in
-                          sublist] or child_tree in equal_nodes.keys():
-            if child_tree in equal_nodes_mapping.keys():
-                actual_label = equal_nodes_mapping[child_tree]
-            else:
-                actual_label = child_tree
-            if actual_label not in included_labels:
-                if actual_label in equal_nodes.keys():
-                    list_for_combinations.add(tuple(equal_nodes[actual_label]))
-                else:
-                    list_for_combinations.add(tuple(equal_nodes[child_tree]))
-                included_labels.append(actual_label)
-        else:
-            prepared_k_2.add(child_tree)
-        return list_for_combinations, prepared_k_2
-
-
-def produce_combinations(k_2, v_id, str_sequence_help, equal_nodes, equal_nodes_mapping, max_n_2):
+def produce_combinations(k_2, v_id, str_sequence_help, equal_nodes, equal_nodes_mapping):
     if len(equal_nodes) > 0:
-        list_for_combinations, prepared_k_2 = get_comb_last_and_children(equal_nodes, equal_nodes_mapping, k_2[v_id])
+        list_for_combinations = set()
+        prepared_k_2 = set()
+        included_labels = []
+        for child_tree in k_2[v_id]:
+            if child_tree in [item for sublist in list(equal_nodes.values()) for item in
+                              sublist] or child_tree in equal_nodes.keys():
+                if child_tree in equal_nodes_mapping.keys():
+                    actual_label = equal_nodes_mapping[child_tree]
+                else:
+                    actual_label = child_tree
+                if actual_label not in included_labels:
+                    if actual_label in equal_nodes.keys():
+                        list_for_combinations.add(tuple(equal_nodes[actual_label]))
+                    else:
+                        list_for_combinations.add(tuple(equal_nodes[child_tree]))
+                    included_labels.append(actual_label)
+            else:
+                prepared_k_2.add(child_tree)
         combinations_repeated = list(product(*(list_for_combinations)))
         all_combinations = []
         for l in combinations_repeated:
             if len(prepared_k_2) > 0:
                 merged = list(l) + list(prepared_k_2)
-                all_combinations.extend(list(combinations(merged, i)) for i in range(1, max_n_2 + 1))
+                all_combinations.extend(list(combinations(merged, i)) for i in range(1, len(merged) + 1))
             else:
-                all_combinations.extend(list(combinations(list(l), i)) for i in range(1, max_n_2 + 1))
+                all_combinations.extend(list(combinations(list(l), i)) for i in range(1, len(list(l)) + 1))
     else:
         list_for_combinations = k_2[v_id]
         all_combinations = [list(combinations(list_for_combinations, i)) for i in
@@ -402,30 +397,10 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
                 combination_ids = {}
                 str_sequence_help = {}
                 duplicate_combs = {}  # for several cases
-                equal_nodes_temp = {}
-                num_addit_nodes = {}
-                max_n_1 = 0
-                max_n_2 = 0  # no need to compute combinations for the longest children list full len
+                # generate combinations
                 for v_id in ids:
                     equal_nodes = collect_equal_nodes(whole_tree, v_id, old_node_new_nodes, equal_nodes_mapping)
-                    equal_nodes_temp[v_id] = equal_nodes.copy()
-                    additional_nodes = set([val for values in equal_nodes.values() for val in values]) - set(equal_nodes.keys())
-                    num_addit_nodes[v_id] = len(additional_nodes)
-                    curr_n = len(k_2[v_id] - additional_nodes)
-                    if curr_n > max_n_1:
-                        max_n_2 = max_n_1
-                        max_n_1 = curr_n
-                equal_nodes_temp_sorted = {k: equal_nodes_temp[k] for k, _ in sorted(num_addit_nodes.items(), key=lambda item: item[1])}
-                # generate combinations
-                count = 0
-                for v_id, eq_nodes in equal_nodes_temp_sorted.items():
-                    count += 1
-                    if count == len(equal_nodes_temp_sorted): # is latest is with max n of additional nodes
-                        all_combinations_str_joined = produce_combinations(k_2, v_id, str_sequence_help, eq_nodes,
-                                                                           equal_nodes_mapping, max_n_2)
-                    else:
-                        all_combinations_str_joined = produce_combinations(k_2, v_id, str_sequence_help, eq_nodes,
-                                                                           equal_nodes_mapping, max_n_2)
+                    all_combinations_str_joined = produce_combinations(k_2, v_id, str_sequence_help, equal_nodes, equal_nodes_mapping)
                     for label in all_combinations_str_joined:
                         if label in combination_ids.keys():
                             combination_ids[label].append(v_id)
