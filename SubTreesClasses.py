@@ -10,7 +10,8 @@ from Tree import Tree, Node, Edge
 from Constants import *
 from Util import create_needed_directories, merge_in_file, filter_classes, write_tree_in_table, write_in_file_old, \
     write_classes_in_txt, filter_meaningless_classes, get_all_words, label_classes, get_joint_lemmas, \
-    sort_already_logged, write_sorted_res_in_file, squash_classes
+    sort_already_logged, write_sorted_res_in_file, squash_classes, \
+    label_data_with_wiki
 from Visualisation import draw_histogram
 from W2Vprocessing import load_trained_word2vec, train_word2vec, train_node2vec, visualize_embeddings
 
@@ -582,6 +583,7 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
 
 
 def main():
+    # label_data_with_wiki()
     # merge_in_file()
     # create_needed_directories()
     # sort_the_data()
@@ -590,10 +592,10 @@ def main():
     # draw_histogram()
 
     # lemmas_list = get_joint_lemmas('medicalTextTrees/all_lemmas_n2v.txt', 'medicalTextTrees/all_lemmas_w2v.txt')
-    dict1 = sort_already_logged('medicalTextTrees/merged_long.txt')
-    dict2 = sort_already_logged('medicalTextTrees/merged_wtf2.txt')
-    write_sorted_res_in_file(dict1, 'medicalTextTrees/merged_long_sorted.txt')
-    write_sorted_res_in_file(dict2, 'medicalTextTrees/merged_wtf2_sorted.txt')
+    # dict1 = sort_already_logged('medicalTextTrees/merged_long.txt')
+    # dict2 = sort_already_logged('medicalTextTrees/merged_wtf2.txt')
+    # write_sorted_res_in_file(dict1, 'medicalTextTrees/merged_long_sorted.txt')
+    # write_sorted_res_in_file(dict2, 'medicalTextTrees/merged_wtf2_sorted.txt')
     start = time.time()
     # trees_df_filtered, test_df = read_data() # TEST
     trees_df_filtered = read_data()
@@ -636,7 +638,8 @@ def main():
             whole_tree_plain.set_help_dict()
             train_node2vec(whole_tree_plain, dict_lemmas_rev)
             # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id) #dict_lemmas,
-            load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_node2vec.model")
+            # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_node2vec.model")
+            load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_final.model")
         print('Time on word2vec: ' + str(time.time() - start))
 
     start = time.time()

@@ -6,6 +6,8 @@ import csv
 import os
 import re
 from collections import defaultdict
+from itertools import permutations
+from operator import itemgetter
 
 import pandas as pd
 
@@ -153,7 +155,7 @@ def filter_classes(classes_part, classes_part_list, whole_tree, remapped_sent_re
         if len(vertex_seq.items()) > 0 and len(vertex_seq[list(vertex_seq)[0]]) > 1:
             for v_id, entries in vertex_seq.items():
                 sent_name = remapped_sent_rev[entries[0].sent_name]
-                for ent in entries: # FOR WRITING ALL LEMMAS
+                for ent in entries:  # FOR WRITING ALL LEMMAS
                     all_forms.add(ent.form)
                 if class_id not in classes_wordgroups.keys():
                     classes_wordgroups[class_id] = [tuple(entries)]
@@ -161,7 +163,9 @@ def filter_classes(classes_part, classes_part_list, whole_tree, remapped_sent_re
                 else:
                     classes_wordgroups[class_id].append(tuple(entries))
                     classes_sents[class_id].append(sent_name)
-                vertex_seq_ids[v_id] = list(map(lambda list_entry: str(whole_tree.get_edge(list_entry.id)[0].weight) + list_entry.form, entries))
+                vertex_seq_ids[v_id] = list(
+                    map(lambda list_entry: str(whole_tree.get_edge(list_entry.id)[0].weight) + list_entry.form,
+                        entries))
         sent_label = tuple(temp_sent_set)
         if sent_label not in sent_unique_class_content.keys():
             new_entries_set = set([tuple(i) for i in list(vertex_seq_ids.values())])
@@ -179,18 +183,23 @@ def filter_classes(classes_part, classes_part_list, whole_tree, remapped_sent_re
                         is_new_nested_in_existing = False
                         ids_to_filter = set()
                         for existing_array in sent_unique_class_content[sent_label]:
-                            is_existing_nested_in_new = all(entr in new_array for entr in existing_array) and existing_array != new_array
-                            is_new_nested_in_existing = is_new_nested_in_existing or all(entr in existing_array for entr in new_array)
+                            is_existing_nested_in_new = all(
+                                entr in new_array for entr in existing_array) and existing_array != new_array
+                            is_new_nested_in_existing = is_new_nested_in_existing or all(
+                                entr in existing_array for entr in new_array)
                             filter_condition = filter_condition or (is_existing_nested_in_new)
                             if is_existing_nested_in_new:
                                 ids_to_filter.add(existing_array)
                         if filter_condition:
-                            sent_unique_class_content[sent_label] = sent_unique_class_content[sent_label] - ids_to_filter
+                            sent_unique_class_content[sent_label] = sent_unique_class_content[
+                                                                        sent_label] - ids_to_filter
                         if not is_new_nested_in_existing:
                             sent_unique_class_content[sent_label].add(new_array_label)
                     already_checked.add(new_array_label)
                     surviving_strings_classes[new_array_label] = class_id
-    classes_ids_filtered = set([surviving_strings_classes[sent_group] for sent_groups in sent_unique_class_content.values() for sent_group in list(sent_groups)])
+    classes_ids_filtered = set(
+        [surviving_strings_classes[sent_group] for sent_groups in sent_unique_class_content.values() for sent_group in
+         list(sent_groups)])
     classes_wordgroups_filtered = {k: v for k, v in classes_wordgroups.items() if k in classes_ids_filtered}
     classes_sents_filtered = {k: v for k, v in classes_sents.items() if k in classes_ids_filtered}
     all_lemmas = set([dict_form_lemma[form] for form in all_forms])
@@ -218,7 +227,8 @@ def check1st(node_sequence):
 
 
 def get_tags_merged(node_sequence, dict_form_lemma, verbs_to_filter):
-    return EMPTY_STR.join([node.pos_tag if dict_form_lemma[node.form] not in verbs_to_filter else 'Z' for node in node_sequence])
+    return EMPTY_STR.join(
+        [node.pos_tag if dict_form_lemma[node.form] not in verbs_to_filter else 'Z' for node in node_sequence])
 
 
 # filter sequences with meaningless verbs
@@ -226,7 +236,8 @@ def check2nd(node_sequence, dict_form_lemma, verbs_to_filter):
     # Ex: была где был откуда : "ZCZC"
     mapped_tags_str = get_tags_merged(node_sequence, dict_form_lemma, verbs_to_filter)
     matched_substring = pattern_verb_check.match(mapped_tags_str)
-    if matched_substring is not None and len(matched_substring.group(0)) > len(mapped_tags_str) - len(matched_substring.group(0)):
+    if matched_substring is not None and len(matched_substring.group(0)) > len(mapped_tags_str) - len(
+            matched_substring.group(0)):
         return False
     return True
 
@@ -242,9 +253,11 @@ def filter_meaningless_classes(classes_wordgroups_filtered, dict_form_lemma):
     meaningless_classes = {}
     verbs_to_filter = ['быть', 'стать']
     for class_id, node_sequences_list in classes_wordgroups_filtered.items():
-        node_sequence = node_sequences_list[0] # checking the 1st entry of a class (considering others don't differ in structure)
+        node_sequence = node_sequences_list[
+            0]  # checking the 1st entry of a class (considering others don't differ in structure)
         has_help_verb_as_root = dict_form_lemma[node_sequence[0].form] in verbs_to_filter
-        if check1st(node_sequence) and (not has_help_verb_as_root or check2nd(node_sequence, dict_form_lemma, verbs_to_filter)):
+        if check1st(node_sequence) and (
+                not has_help_verb_as_root or check2nd(node_sequence, dict_form_lemma, verbs_to_filter)):
             mapped_tags_str = get_tags_merged(node_sequence, dict_form_lemma, verbs_to_filter)
             if has_help_verb_as_root and pattern_help_verbs_in_row.match(mapped_tags_str):
                 squashed_seq_list = []
@@ -262,7 +275,8 @@ def get_all_words(meaningful_classes, dict_form_lemma):
     classes_words = {}
     classes_count_passive_verbs = {}
     for class_id, node_sequences_list in meaningful_classes.items():
-        count_passive_verbs = len(list(filter(lambda node: node.pos_tag == 'V' and node.pos_extended[-3] == 'p', [node for node_seq in node_sequences_list for node in node_seq])))
+        count_passive_verbs = len(list(filter(lambda node: node.pos_tag == 'V' and node.pos_extended[-3] == 'p',
+                                              [node for node_seq in node_sequences_list for node in node_seq])))
         classes_count_passive_verbs[class_id] = count_passive_verbs
         words_in_class = set([node.form for node_seq in node_sequences_list for node in node_seq])
         classes_words[class_id] = list(map(lambda form: dict_form_lemma[form], words_in_class))
@@ -279,17 +293,22 @@ def write_all_lemmas(all_lemmas):
         filehandle.close()
 
 
-def write_classes_in_txt(whole_tree, meningful_classes, classes_sents_filtered, new_classes_mapping, dict_rel_rev, class_labels, path):
+def write_classes_in_txt(whole_tree, meningful_classes, classes_sents_filtered, new_classes_mapping, dict_rel_rev,
+                         class_labels, path):
     count = 1
     for class_id, node_seq_list in meningful_classes.items():
         filename = path + '/%s.txt' % (str(count))
         try:
             with open(filename, 'w', encoding='utf-8') as filehandle:
                 if len(class_labels) > 0:  # empty dict comes for useless classes, which are also logged in file
-                    filehandle.write("label: %s\n" % (SPACE.join(str(i) for i in class_labels[new_classes_mapping[class_id][0]])))
+                    filehandle.write(
+                        "label: %s\n" % (SPACE.join(str(i) for i in class_labels[new_classes_mapping[class_id][0]])))
                 for repeat_count, node_seq in enumerate(node_seq_list):
-                    joined_res_str = SPACE.join(list(map(lambda node: '(' + str(dict_rel_rev[whole_tree.get_edge(node.id)[0].weight]) + ') ' + node.form + ' /' + node.pos_tag + '/ ', node_seq)))
-                    filehandle.write("sent=%s: %s\n" % ('some_sent', joined_res_str)) # WRONG!!!! SENT!!!!
+                    joined_res_str = SPACE.join(list(map(lambda node: '(' + str(dict_rel_rev[
+                                                                                    whole_tree.get_edge(node.id)[
+                                                                                        0].weight]) + ') ' + node.form + ' /' + node.pos_tag + '/ ',
+                                                         node_seq)))
+                    filehandle.write("sent=%s: %s\n" % ('some_sent', joined_res_str))  # WRONG!!!! SENT!!!!
         finally:
             filehandle.close()
         count += 1
@@ -338,8 +357,11 @@ def write_in_file_old(classes_part, classes_part_list, whole_tree, remapped_sent
                             words = list(map(lambda list_entry: list_entry[2], value))
                             if count not in classes_words.keys():
                                 classes_words[count] = words
-                            filehandle.write("len=%d h=%d sent=%s %s: %s\n" % (len(value), curr_height, value[0][1], remapped_sent_rev[value[0][3]],
-                                                                                   SPACE.join(SPACE.join(list(map(lambda list_entry: '(' + str(dict_rel_rev[list_entry[4]]) + ') ' + str(list_entry[2]), value))).split(' ')[1:])))
+                            filehandle.write("len=%d h=%d sent=%s %s: %s\n" % (
+                            len(value), curr_height, value[0][1], remapped_sent_rev[value[0][3]],
+                            SPACE.join(SPACE.join(list(map(
+                                lambda list_entry: '(' + str(dict_rel_rev[list_entry[4]]) + ') ' + str(list_entry[2]),
+                                value))).split(' ')[1:])))
                 finally:
                     filehandle.close()
     return classes_words
@@ -354,7 +376,8 @@ def get_joint_lemmas(path1, path2):
         reader1.close()
         reader2.close()
     joint_lemmas = set(lemmas1).intersection(set(lemmas2))
-    cleared_lemmas = list(filter(lambda lemma: lemma != '.', list(map(lambda lemma: lemma.split('\n')[0], joint_lemmas))))
+    cleared_lemmas = list(
+        filter(lambda lemma: lemma != '.', list(map(lambda lemma: lemma.split('\n')[0], joint_lemmas))))
     return cleared_lemmas
 
 
@@ -366,6 +389,7 @@ def write_dict_in_file(similar_lemmas_dict_filtered):
                 filehandle.write("%s : %s\n" % (word, tuple(similar_words)))
     finally:
         filehandle.close()
+
 
 # def write_tree_in_table(whole_tree, dict_rel_rev, labels):
 #     source_1 = 'medicalTextTrees/gephi_edges_import_word2vec.csv'
@@ -420,8 +444,10 @@ def write_sorted_res_in_file(result_dict, path):
 def squash_classes(whole_tree, meaningful_classes_filtered, dict_lemmas_similar, dict_form_lemma_int):
     class_id_repr = {}
     for class_id, entries_list in meaningful_classes_filtered.items():
-        class_weights = list(sorted([whole_tree.get_edge(entries_list[0][i].id)[0].weight for i in range(1, len(entries_list[0]))]))
-        class_lemmas = list(sorted(set([dict_lemmas_similar[dict_form_lemma_int[entry.form]] for entries in entries_list for entry in entries])))
+        class_weights = list(
+            sorted([whole_tree.get_edge(entries_list[0][i].id)[0].weight for i in range(1, len(entries_list[0]))]))
+        class_lemmas = list(sorted(set(
+            [dict_lemmas_similar[dict_form_lemma_int[entry.form]] for entries in entries_list for entry in entries])))
         class_id_repr[class_id] = tuple(class_lemmas + class_weights)
     grouped_classes = defaultdict(list)
     for key, val in sorted(class_id_repr.items()):
@@ -438,3 +464,66 @@ def squash_classes(whole_tree, meaningful_classes_filtered, dict_lemmas_similar,
         meaningful_classes_filtered_squashed[count] = merged_class
         count += 1
     return meaningful_classes_filtered_squashed, new_classes_mapping
+
+
+# HARD CODE!!!!!
+def label_data_with_wiki():
+    # num = re.compile("^[0-9]+.*$")
+    time_label = 'Временная метка'
+    flag = True
+    path = ALGO_RESULT_N2V_FILT
+    try:
+        with open(path, encoding='utf-8') as reader:
+            class_entries = reader.readlines()
+    finally:
+        reader.close()
+    class_count = 1
+    class_id_words = {}
+    class_id_label = {}
+    for line in class_entries:
+        if not re.match('label*', line):
+            if line != NEW_LINE and flag:
+                line_split = [w for w in line.split(':')[1].split(NEW_LINE)[0].split(" ") if w != EMPTY_STR]
+                words = line_split[1::3]
+                pos_tags = line_split[2::3]
+                if '/N/' in pos_tags:
+                    filtered_indices = [i for i, x in enumerate(pos_tags) if x == '/N/' or x == '/A/']
+                    start_index = 0
+                    subseqs = set()
+                    if len(filtered_indices) > 0:
+                        curr_len = 1
+                        for i in range(0, len(filtered_indices) - 1):
+                            if filtered_indices[i + 1] - filtered_indices[i] == 1:
+                                curr_len += 1
+                            else:
+                                target_indices = filtered_indices[start_index:start_index + curr_len]
+                                word_seq = tuple(set([words[index] for index in target_indices]))
+                                subseqs.add(word_seq)
+                                start_index = curr_len
+                                curr_len = 1
+                        subseqs.add(tuple([words[filtered_indices[-1]]]))
+                    if class_count not in class_id_words.keys():
+                        class_id_words[class_count] = subseqs
+                    else:
+                        class_id_words[class_count].update(subseqs)
+            else:
+                class_count += 1
+        else:
+            if time_label in line.split(':')[1]:
+                flag = False
+            else:
+                flag = True
+    class_extended_repeats = {}
+    for class_id, repeat_set in class_id_words.items():
+        new_extended_set = set()
+        for repeat in repeat_set:
+            if len(repeat) > 1:
+                for i in range(1, len(repeat) + 1):
+                    new_extended_set.update(list(permutations(repeat, i)))
+            else:
+                new_extended_set.add(repeat[0])
+        class_extended_repeats[class_id] = new_extended_set
+    res = defaultdict(list)
+    for key, val in sorted(class_id_label.items()):
+        res[val].append(key)
+    tttt = []

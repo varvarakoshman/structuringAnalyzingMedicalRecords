@@ -55,8 +55,8 @@ def train_node2vec(whole_tree_plain, dict_lemmas_rev):
         nodes=stellar_graph.nodes(),  # root nodes
         length=walk_length,  # maximum length of a random walk
         n=5,  # number of random walks per root node
-        p=4,  # Defines (unormalised) probability, 1/p, of returning to source node
-        q=6,  # Defines (unormalised) probability, 1/q, for moving away from source node
+        p=1,  # Defines (unormalised) probability, 1/p, of returning to source node
+        q=2,  # Defines (unormalised) probability, 1/q, for moving away from source node
         weighted=True,  # for weighted random walks
         seed=42,  # random seed fixed for reproducibility
     )

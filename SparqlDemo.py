@@ -34,12 +34,11 @@ from WikidataEntity import WikidataEntity
 #                       "P5209", "P5270", "P5329", "P5375", "P5376", "P5415", "P5450", "P5458", "P5468", "P5496", "P5501",
 #                       "P5806", "P5843", "P6220"]
 
-# DONE
-# "P636"
-# "P688" - 3 pages
-# "P673", "P486", "P715", "P699"
+# DONE: "P636", "P688" (3 pages), "P673", "P486", "P715", "P699", "P780", "P923", "P924"
 
-medical_properties = ["P699"]
+medical_properties = ["P2452", "P1748", "P557", "P2892", "P4338", "P3550", "P3841", "P4495", "P5270", "P1694", "P1693",
+                      "P1554", "P1550", "P1323", "P696", "P595", "P494", "P1692", "P1461", "P667", "P2275", "P4250",
+                      "P2176", "P1995"]
 
 INSTANCE_OF = "P31"
 SUBCLASS_OF = "P279"
@@ -50,9 +49,12 @@ WIKIDATA_API_ENDPOINT = "https://www.wikidata.org/w/api.php"
 BATCH_SIZE = 10000
 # BATCH_SIZE = 10  # TEST
 IDS_LIMIT = 50  # no more ids allowed to be fetched at once
+
 # noinspection SqlDialectInspection
 insert_main_query = """INSERT INTO wiki_main_entity (q_id, entity_label, entity_description, instance_of, subclass_of, part_of) VALUES (%s, %s, %s, %s, %s, %s)"""
 insert_ref_query = """INSERT INTO wiki_ref_entity (entity_label, q_id) VALUES (%s, %s)"""
+# noinspection SqlDialectInspection
+select_qids_qiery = """select q_id from wiki_main_entity"""
 
 
 def chunks(lst, n):
@@ -131,7 +133,7 @@ def get_labels_and_desc_by_qids(filtered_res_dict_corrected):
         try:
             for qid in qids_batch:
                 new_entity = WikidataEntity(qid)
-                label = response_json['entities'][qid]['labels']['ru']['value']
+                label = response_json['entities'][qid]['labels']['ru']['value'].lower()
                 new_entity.label = label
                 description_opt = response_json['entities'][qid]['descriptions']
                 if len(description_opt) > 0:
@@ -162,21 +164,27 @@ def get_labels_and_desc_by_qids(filtered_res_dict_corrected):
 def fetch_wikidata():
     for medical_property in medical_properties:
         limit = BATCH_SIZE
-        offset = 10000
-        # curr_df_len = BATCH_SIZE
-        # while curr_df_len == BATCH_SIZE:
-        results = get_entities_qids_by_search_term_sparql(medical_property, limit, offset)
-        results_df = pd.io.json.json_normalize(results['results']['bindings'])
-        filtered_res_dict = {k: v for k, v in
-                             dict(zip(results_df['subject.value'].to_list(),
-                                      results_df['subjectLabel.value'].to_list())).items()
-                             if not pattern_empty.match(v)}
-        filtered_res_dict_corrected = {k.split('/')[-1]: v.lower() for k, v in filtered_res_dict.items()}
-        wikidata_entities = get_labels_and_desc_by_qids(filtered_res_dict_corrected)
-        for wikidata_entity in wikidata_entities:
-            save_entity(wikidata_entity)
-        # curr_df_len = len(results_df)
-        offset += BATCH_SIZE
+        offset = 0
+        curr_df_len = BATCH_SIZE
+        while curr_df_len == BATCH_SIZE:
+            results = get_entities_qids_by_search_term_sparql(medical_property, limit, offset)
+            results_df = pd.io.json.json_normalize(results['results']['bindings'])
+            filtered_res_dict = {k: v for k, v in
+                                 dict(zip(results_df['subject.value'].to_list(),
+                                          results_df['subjectLabel.value'].to_list())).items()
+                                 if not pattern_empty.match(v)}
+            existing_q_ids = [x[0] for x in get_all_existing_qids()]
+            filtered_res_dict_corrected = {}
+            for k, v in filtered_res_dict.items():
+                key = k.split('/')[-1]
+                if key not in existing_q_ids:
+                    filtered_res_dict_corrected[key] = v.lower()
+            wikidata_entities = get_labels_and_desc_by_qids(filtered_res_dict_corrected)
+            for wikidata_entity in wikidata_entities:
+                save_entity(wikidata_entity)
+            print("Entities with property %s were saved in DB", medical_property)
+            curr_df_len = len(results_df)
+            offset += BATCH_SIZE
     finish = []
 
 
@@ -186,7 +194,10 @@ def save_entity(wiki_entity):
                                       port="5432",
                                       database="wikidump")
         cursor = connection.cursor()
-        cursor.execute(insert_main_query, (wiki_entity.qid, wiki_entity.label, wiki_entity.description, wiki_entity.instance_of, wiki_entity.subclass_of, wiki_entity.part_of))
+        cursor.execute(insert_main_query, (
+            wiki_entity.qid, wiki_entity.label, wiki_entity.description, wiki_entity.instance_of,
+            wiki_entity.subclass_of,
+            wiki_entity.part_of))
         for alias in wiki_entity.aliases:
             cursor.execute(insert_ref_query, (alias, wiki_entity.qid))
         connection.commit()
@@ -197,6 +208,25 @@ def save_entity(wiki_entity):
             cursor.close()
             connection.close()
             print("PostgreSQL connection is closed")
+
+
+def get_all_existing_qids():
+    q_ids = []
+    try:
+        connection = psycopg2.connect(host="localhost",
+                                      port="5432",
+                                      database="wikidump")
+        cursor = connection.cursor()
+        cursor.execute(select_qids_qiery)
+        q_ids = cursor.fetchall()
+    except (Exception, Error) as error:
+        print("Error while connecting to PostgreSQL", error)
+    finally:
+        if (connection):
+            cursor.close()
+            connection.close()
+            print("PostgreSQL connection is closed")
+    return q_ids
 
 
 if __name__ == '__main__':
