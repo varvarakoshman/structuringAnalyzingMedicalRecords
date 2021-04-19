@@ -35,6 +35,7 @@ WRITE_IN_FILES = True
 # Additional constants
 EMPTY_STR = ""
 DOT = "."
+COMMA = ','
 SPACE = " "
 UNDERSCORE = '_'
 NEW_LINE = "\n"

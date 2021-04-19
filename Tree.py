@@ -14,7 +14,7 @@ class Node:
 
 
 class Edge:
-    def __init__(self, node_id_from, node_id_to, weight):
+    def __init__(self, node_id_from, node_id_to, weight=None):
         self.node_from = node_id_from
         self.node_to = node_id_to
         self.weight = weight  # relation type

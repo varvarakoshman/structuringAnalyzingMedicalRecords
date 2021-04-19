@@ -1,19 +1,15 @@
 import time
 from collections import defaultdict
 from itertools import combinations, product
-from hashlib import blake2b
-import numpy as np
-import matplotlib.pyplot as plt
 
 from Preprocessing import read_data, replace_time_constructions
 from Tree import Tree, Node, Edge
-from Constants import *
-from Util import create_needed_directories, merge_in_file, filter_classes, write_tree_in_table, write_in_file_old, \
-    write_classes_in_txt, filter_meaningless_classes, get_all_words, label_classes, get_joint_lemmas, \
-    sort_already_logged, write_sorted_res_in_file, squash_classes, \
-    label_data_with_wiki
-from Visualisation import draw_histogram
-from W2Vprocessing import load_trained_word2vec, train_word2vec, train_node2vec, visualize_embeddings
+from Util import merge_in_file, filter_classes, write_classes_in_txt, filter_meaningless_classes, get_all_words, \
+    label_classes, \
+    squash_classes, \
+    label_data_with_wiki, get_all_wikidata_entities, construct_db_tree
+from W2Vprocessing import load_trained_word2vec, train_node2vec, train_node2vec_db
+from const.Constants import *
 
 
 def construct_tree(trees_df_filtered, dict_lemmas, dict_rel, remapped_sent):
@@ -583,6 +579,8 @@ def compute_part_subtrees(whole_tree, lemma_count, grouped_heights):
 
 
 def main():
+    uu = []
+    # whole_tree_plain = construct_db_tree()
     # label_data_with_wiki()
     # merge_in_file()
     # create_needed_directories()
@@ -630,13 +628,15 @@ def main():
         start = time.time()
         if LOAD_TRAINED:
             # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id)
-            load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_node2vec.model")  # node2vec
+            load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_final.model")  # node2vec
+            # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_node2vec")  # node2vec
             # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained.model") # word2vec
         else:
             # train_word2vec(trees_df_filtered)
             whole_tree_plain = construct_tree(trees_df_filtered, dict_lemmas_full, dict_rel, remapped_sent) # graph is needed for node2vec
             whole_tree_plain.set_help_dict()
-            train_node2vec(whole_tree_plain, dict_lemmas_rev)
+            db_tree_edges = construct_db_tree(get_all_wikidata_entities())
+            train_node2vec(whole_tree_plain, db_tree_edges, dict_lemmas_rev)
             # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id) #dict_lemmas,
             # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_node2vec.model")
             load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_final.model")
@@ -708,14 +708,15 @@ def main():
     # for key, values in sorted(class_labels.items()):
     #     for value in values:
     #         grouped_classes_by_label[value].append(key)
-
+    meaningful_classes_filtered_squashed_sort = dict(sorted(meaningful_classes_filtered_squashed.items(), key=lambda x: len(x[1]), reverse=True))
+    class_id_labels = label_data_with_wiki(meaningful_classes_filtered_squashed_sort, dict_form_lemma_str, class_labels, new_classes_mapping)
     if WRITE_IN_FILES:
         # meaningful
-        write_classes_in_txt(whole_tree, meaningful_classes_filtered_squashed, classes_sents_filtered, new_classes_mapping, dict_rel_rev, class_labels, RESULT_PATH)
+        write_classes_in_txt(whole_tree, meaningful_classes_filtered_squashed_sort, classes_sents_filtered, new_classes_mapping, dict_rel_rev, class_labels, RESULT_PATH)
         merge_in_file(RESULT_PATH, MERGED_PATH)
         # meaningless
-        write_classes_in_txt(whole_tree, meaningless_classes, classes_sents_filtered, new_classes_mapping, dict_rel_rev, {}, RESULT_PATH_FILTERED)
-        merge_in_file(RESULT_PATH_FILTERED, MERGED_PATH_FILTERED)
+        # write_classes_in_txt(whole_tree, meaningless_classes, classes_sents_filtered, new_classes_mapping, dict_rel_rev, {}, RESULT_PATH_FILTERED)
+        # merge_in_file(RESULT_PATH_FILTERED, MERGED_PATH_FILTERED)
     print('Time on writing data new: ' + str(time.time() - start))
     gg = []
 

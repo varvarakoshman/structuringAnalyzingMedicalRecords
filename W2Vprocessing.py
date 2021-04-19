@@ -2,13 +2,13 @@ from gensim.models import Word2Vec, KeyedVectors
 from matplotlib import pyplot
 from sklearn.manifold import TSNE
 
-from Constants import *
+from const.Constants import *
 import re
 import pandas as pd
 from stellargraph import StellarDiGraph
 from stellargraph.data import BiasedRandomWalk
 
-from Util import write_dict_in_file, label_lemmas
+from Util import label_lemmas
 import nltk
 nltk.download("stopwords")
 from nltk.corpus import stopwords
@@ -37,17 +37,48 @@ def train_word2vec(trees_df_filtered):
     medical_model.save("trained.model")
 
 
-def train_node2vec(whole_tree_plain, dict_lemmas_rev):
-    walk_length = 10
+def train_node2vec_db(all_edges):
+    walk_length = 5
+    sources = list(map(lambda edge: edge.node_from, all_edges))
+    targets = list(map(lambda edge: edge.node_to, all_edges))
+    edges = pd.DataFrame({
+        "source": sources,
+        "target": targets
+    })
+    stellar_graph = StellarDiGraph(edges=edges)
+    random_walk = BiasedRandomWalk(stellar_graph)
+    weighted_walks = random_walk.run(
+        nodes=stellar_graph.nodes(),  # root nodes
+        length=walk_length,  # maximum length of a random walk
+        n=3,  # number of random walks per root node
+        p=1,  # Defines (unormalised) probability, 1/p, of returning to source node
+        q=2,  # Defines (unormalised) probability, 1/q, for moving away from source node
+        weighted=True,  # for weighted random walks
+        seed=42,  # random seed fixed for reproducibility
+    )
+    print("Number of random walks: {}".format(len(weighted_walks)))
+    weighted_model = Word2Vec(min_count=1)
+    weighted_model.build_vocab(weighted_walks)
+    additional_model = KeyedVectors.load_word2vec_format(ADDITIONAL_CORPUS_PATH, binary=True, unicode_errors='ignore')
+    weighted_model.build_vocab([list(additional_model.vocab.keys())[:UPPER_BOUND_ADDITIONAL_DATA]], update=True)
+    weighted_model.intersect_word2vec_format(ADDITIONAL_CORPUS_PATH, binary=True, lockf=1.0, unicode_errors='ignore')
+    weighted_model.train(weighted_walks, total_examples=weighted_model.corpus_count, epochs=weighted_model.iter)
+    weighted_model.save("trained_node2vec_db.model")
+
+
+def train_node2vec(whole_tree_plain, db_edges, dict_lemmas_rev):
+    walk_length = 6
     # filtered_edges = list(filter(lambda edge: edge.node_from != 0, whole_tree_plain.edges))
     dict_lemmas_rev[0] = 'root'
     sources = list(map(lambda edge: dict_lemmas_rev[whole_tree_plain.get_node(edge.node_from).lemma], whole_tree_plain.edges))
     targets = list(map(lambda edge: dict_lemmas_rev[whole_tree_plain.get_node(edge.node_to).lemma], whole_tree_plain.edges))
-    weights = list(map(lambda edge: edge.weight, whole_tree_plain.edges))
+    # weights = list(map(lambda edge: edge.weight, whole_tree_plain.edges))
+    sources_db = list(map(lambda edge: edge.node_from, db_edges))
+    targets_db = list(map(lambda edge: edge.node_to, db_edges))
     edges = pd.DataFrame({
-        "source": sources,
-        "target": targets,
-        "weight": weights
+        "source": sources + sources_db,
+        "target": targets + targets_db
+        # "weight": weights
     })
     stellar_graph = StellarDiGraph(edges=edges)
     random_walk = BiasedRandomWalk(stellar_graph)
@@ -67,7 +98,7 @@ def train_node2vec(whole_tree_plain, dict_lemmas_rev):
     weighted_model.build_vocab([list(additional_model.vocab.keys())[:UPPER_BOUND_ADDITIONAL_DATA]], update=True)
     weighted_model.intersect_word2vec_format(ADDITIONAL_CORPUS_PATH, binary=True, lockf=1.0, unicode_errors='ignore')
     weighted_model.train(weighted_walks, total_examples=weighted_model.corpus_count, epochs=weighted_model.iter)
-    weighted_model.save("trained_node2vec.model")
+    weighted_model.save("trained_node2vec_joined.model")
 
 
 def load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, model_name): #dict_lemmas_filt,
@@ -82,7 +113,7 @@ def load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, model_name):
                     similar_lemmas_dict[lemma] = [similar_lemma]
                 else:
                     similar_lemmas_dict[lemma].append(similar_lemma)
-    all_values = [item for sublist in similar_lemmas_dict.values() for item in sublist]
+    # all_values = [item for sublist in similar_lemmas_dict.values() for item in sublist]
     # most_freq = set([i for i in all_values if all_values.count(i) > 11])
     similar_lemmas_dict_filtered = {}
     for k, v in similar_lemmas_dict.items():

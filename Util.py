@@ -3,20 +3,25 @@
 # vim:fileencoding=utf-8
 
 import csv
+import operator
 import os
 import re
 from collections import defaultdict
 from itertools import permutations
-from operator import itemgetter
 
 import pandas as pd
+from gensim.models import Word2Vec
 
-from Constants import *
-from Preprocessing import months, day_times, seasons, time_labels
+from Tree import Edge
+from WikidataEntity import WikidataEntity
+from const.Constants import *
+from Preprocessing import time_labels
+from sql.postgres_repo import get_entity_fields, select_all_ref, select_all_main
 
 pattern_verb_check = re.compile('(([Z])*([QIRPCS])*)+')
 pattern_help_verbs_in_row = re.compile("^Z{2,}.*$")
 pattern_not_help_verb = r'[^Z]'
+has_russian_letters = re.compile('^.*[а-яА-Я]+.*$')
 
 
 def create_needed_directories():
@@ -466,28 +471,33 @@ def squash_classes(whole_tree, meaningful_classes_filtered, dict_lemmas_similar,
     return meaningful_classes_filtered_squashed, new_classes_mapping
 
 
-# HARD CODE!!!!!
-def label_data_with_wiki():
-    # num = re.compile("^[0-9]+.*$")
+def add_label_to_list(tup, label_q_id):
+    q_id = tup[0]
+    label = tup[1]
+    norm_label = tup[2]
+    if label not in label_q_id.keys():
+        label_q_id[label] = {q_id}
+    else:
+        label_q_id[label].add(q_id)
+    if norm_label not in label_q_id.keys():
+        label_q_id[norm_label] = {q_id}
+    else:
+        label_q_id[norm_label].add(q_id)
+
+
+def label_data_with_wiki(meaningful_classes_filtered_squashed_sort, dict_form_lemma_str, class_labels, new_classes_mapping):
     time_label = 'Временная метка'
-    flag = True
-    path = ALGO_RESULT_N2V_FILT
-    try:
-        with open(path, encoding='utf-8') as reader:
-            class_entries = reader.readlines()
-    finally:
-        reader.close()
-    class_count = 1
-    class_id_words = {}
-    class_id_label = {}
-    for line in class_entries:
-        if not re.match('label*', line):
-            if line != NEW_LINE and flag:
-                line_split = [w for w in line.split(':')[1].split(NEW_LINE)[0].split(" ") if w != EMPTY_STR]
-                words = line_split[1::3]
-                pos_tags = line_split[2::3]
-                if '/N/' in pos_tags:
-                    filtered_indices = [i for i, x in enumerate(pos_tags) if x == '/N/' or x == '/A/']
+    class_id_tokens = {}
+    class_extended_repeats = {}
+    # create search tokens of diff length from class content
+    for class_merged_id, class_entries in meaningful_classes_filtered_squashed_sort.items():
+        labels = set([class_label for old_id in new_classes_mapping[class_merged_id] for class_label in class_labels[old_id]])
+        if time_label not in labels:
+            for class_entry in class_entries:
+                words = [dict_form_lemma_str[node.form] for node in class_entry]
+                pos_tags = [node.pos_tag for node in class_entry]
+                if 'N' in pos_tags:
+                    filtered_indices = [i for i, x in enumerate(pos_tags) if x == 'N' or x == 'A']
                     start_index = 0
                     subseqs = set()
                     if len(filtered_indices) > 0:
@@ -501,29 +511,118 @@ def label_data_with_wiki():
                                 subseqs.add(word_seq)
                                 start_index = curr_len
                                 curr_len = 1
-                        subseqs.add(tuple([words[filtered_indices[-1]]]))
-                    if class_count not in class_id_words.keys():
-                        class_id_words[class_count] = subseqs
+                        subseqs.add(tuple([words[index] for index in filtered_indices[start_index:start_index + curr_len]]))
+                    if class_merged_id not in class_id_tokens.keys():
+                        class_id_tokens[class_merged_id] = subseqs
                     else:
-                        class_id_words[class_count].update(subseqs)
-            else:
-                class_count += 1
+                        class_id_tokens[class_merged_id].update(subseqs)
+            if class_merged_id in class_id_tokens.keys():
+                new_extended_set = set()
+                for repeat in list(class_id_tokens[class_merged_id]):
+                    if len(repeat) > 1:
+                        for i in range(1, len(repeat) + 1):
+                            new_extended_set.update(list(map(lambda x: SPACE.join(x), list(permutations(repeat, i)))))
+                    else:
+                        new_extended_set.add(repeat[0])
+                class_extended_repeats[class_merged_id] = new_extended_set
+    # load trained W2V model
+    w2v_joined_model = Word2Vec.load('trained_node2vec_joined.model')
+    # get all existing entities form DB
+    label_q_id = {}
+    q_id_categories = {}
+    remember_disambiguated_tokens = {}
+    all_ref_entities = get_entity_fields(select_all_ref)
+    all_main_entities = get_entity_fields(select_all_main)
+    for tup in all_ref_entities:
+        add_label_to_list(tup, label_q_id)
+    for tup in all_main_entities:
+        add_label_to_list(tup, label_q_id)
+        q_id_categories[tup[0]] = tuple(tup[3:])
+    class_id_labels = {}
+    for class_id, search_tokens in class_extended_repeats.items():
+        for search_token in search_tokens:
+            if search_token in label_q_id.keys():
+                q_ids = list(label_q_id[search_token])
+                if len(q_ids) > 1:
+                    if search_token not in remember_disambiguated_tokens.keys():
+                        most_probable = disambiguate(w2v_joined_model, q_id_categories, q_ids, search_token)
+                        remember_disambiguated_tokens[search_token] = most_probable
+                    else:
+                        most_probable = remember_disambiguated_tokens[search_token]
+                else:
+                    most_probable = pick_first_category(q_id_categories, q_ids[0])
+                if most_probable != EMPTY_STR:
+                    if class_id not in class_id_labels.keys():
+                        class_id_labels[class_id] = {most_probable}
+                    else:
+                        class_id_labels[class_id].add(most_probable)
+    return class_id_labels
+
+
+def pick_first_category(q_id_categories, q_id):
+    categories = q_id_categories[q_id]
+    instance_of = categories[0]
+    subclass_of = categories[1]
+    part_of = categories[2]
+    most_probable = EMPTY_STR
+    if instance_of != EMPTY_STR:
+        most_probable = get_russian_match(instance_of)
+    elif subclass_of != EMPTY_STR:
+        most_probable = get_russian_match(subclass_of)
+    elif part_of != EMPTY_STR:
+        most_probable = get_russian_match(part_of)
+    return most_probable
+
+
+def disambiguate(w2v_joined_model, q_id_categories, q_ids, search_token):
+    possible_labels_similarity_score = {}
+    for q_id in q_ids:
+        possible_label = pick_first_category(q_id_categories, q_id)
+        if possible_label != EMPTY_STR:
+            possible_labels_similarity_score[possible_label] = w2v_joined_model.wv.similarity(possible_label, search_token)
+    most_probable = next(iter(dict(sorted(possible_labels_similarity_score.items(), key=operator.itemgetter(1), reverse=True))))
+    return most_probable
+
+
+def get_all_wikidata_entities():
+    all_ref_entities = get_entity_fields(select_all_ref)
+    q_id_aliases = {}
+    for tup in all_ref_entities:
+        q_id = tup[0]
+        norm_label = tup[2]
+        if q_id not in q_id_aliases.keys():
+            q_id_aliases[q_id] = [norm_label]
         else:
-            if time_label in line.split(':')[1]:
-                flag = False
-            else:
-                flag = True
-    class_extended_repeats = {}
-    for class_id, repeat_set in class_id_words.items():
-        new_extended_set = set()
-        for repeat in repeat_set:
-            if len(repeat) > 1:
-                for i in range(1, len(repeat) + 1):
-                    new_extended_set.update(list(permutations(repeat, i)))
-            else:
-                new_extended_set.add(repeat[0])
-        class_extended_repeats[class_id] = new_extended_set
-    res = defaultdict(list)
-    for key, val in sorted(class_id_label.items()):
-        res[val].append(key)
-    tttt = []
+            q_id_aliases[q_id].append(norm_label)
+    all_main_entities = get_entity_fields(select_all_main)
+    all_wikidata_entities = []
+    for main_entity in all_main_entities:
+        q_id = main_entity[0]
+        aliases = q_id_aliases[q_id] if q_id in q_id_aliases.keys() else []
+        instance_of = get_russian_match(main_entity[3]) if main_entity[3] != EMPTY_STR else EMPTY_STR
+        subclass_of = get_russian_match(main_entity[4]) if main_entity[4] != EMPTY_STR else EMPTY_STR
+        part_of = get_russian_match(main_entity[5]) if main_entity[5] != EMPTY_STR else EMPTY_STR
+        wikidata_entity = WikidataEntity(q_id, label=main_entity[2], instance_of=instance_of,
+                                         subclass_of=subclass_of, part_of=part_of, aliases=aliases)
+        all_wikidata_entities.append(wikidata_entity)
+    return all_wikidata_entities
+
+
+def get_russian_match(entity):
+    for tag in entity.split(COMMA):
+        if has_russian_letters.match(tag):
+            return tag
+    return EMPTY_STR
+
+
+def construct_db_tree(all_wikidata_entities):
+    all_edges = []
+    for wikidata_entity in all_wikidata_entities:
+        parents = [wikidata_entity.instance_of, wikidata_entity.subclass_of, wikidata_entity.part_of]
+        labels = [wikidata_entity.label] + wikidata_entity.aliases
+        for name in labels:
+            for parent in parents:
+                if parent != EMPTY_STR:
+                    all_edges.append(Edge(parent, name))
+    return all_edges
+

@@ -26,7 +26,7 @@ from gensim.models import Word2Vec
 from matplotlib import pyplot
 from sklearn.manifold import TSNE
 
-from Constants import MERGED_PATH, EMPTY_STR, NEW_LINE, VIS_PATH_N2V, ALGO_RESULT_N2V_FILT
+from const.Constants import EMPTY_STR, NEW_LINE, VIS_PATH_N2V, ALGO_RESULT_N2V_FILT
 from Preprocessing import replace_time_constructions, read_data, read_vidal
 
 
