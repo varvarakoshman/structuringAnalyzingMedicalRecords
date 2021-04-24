@@ -39,3 +39,5 @@ COMMA = ','
 SPACE = " "
 UNDERSCORE = '_'
 NEW_LINE = "\n"
+
+WORD_LIMIT = 8

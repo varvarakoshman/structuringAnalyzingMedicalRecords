@@ -3,7 +3,7 @@ from queue import LifoQueue
 
 
 class Node:
-    def __init__(self, id, lemma=None, form=None, sent_name=None, pos_tag=None, pos_extended=None, is_included=False):
+    def __init__(self, id, lemma=None, form=None, sent_name=None, pos_tag=None, pos_extended=None, is_included=False, num_deep_children=0):
         self.id = id
         self.lemma = lemma
         self.form = form
@@ -11,6 +11,7 @@ class Node:
         self.pos_tag = pos_tag
         self.pos_extended = pos_extended
         self.is_included = is_included
+        self.num_deep_children = num_deep_children
 
 
 class Edge:
@@ -35,6 +36,7 @@ class Tree:
         self.global_similar_mapping = {}
         self.dict_lemmas = {}
         self.dict_lemmas_rev = []
+        self.node_id_sent = {}
 
     @staticmethod
     def copy_node_details(existing_node, id_count):
@@ -52,6 +54,7 @@ class Tree:
         self.nodes_dict_id = {node.id: node for node in self.nodes}
         self.edges_dict_to = {k: list(v) for k, v in
                               itertools.groupby(sorted(self.edges, key=lambda x: x.node_to), key=lambda x: x.node_to)}
+        self.node_id_sent = {node.id: node.sent_name for node in self.nodes}
 
     def add_node(self, node):
         self.nodes.append(node)

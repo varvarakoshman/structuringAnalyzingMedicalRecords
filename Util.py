@@ -299,20 +299,20 @@ def write_all_lemmas(all_lemmas):
 
 
 def write_classes_in_txt(whole_tree, meningful_classes, classes_sents_filtered, new_classes_mapping, dict_rel_rev,
-                         class_labels, path):
+                         class_labels, path, class_id_labels):
     count = 1
     for class_id, node_seq_list in meningful_classes.items():
         filename = path + '/%s.txt' % (str(count))
         try:
             with open(filename, 'w', encoding='utf-8') as filehandle:
                 if len(class_labels) > 0:  # empty dict comes for useless classes, which are also logged in file
-                    filehandle.write(
-                        "label: %s\n" % (SPACE.join(str(i) for i in class_labels[new_classes_mapping[class_id][0]])))
+                    filehandle.write("label: %s\n" % (SPACE.join(str(i) for i in class_labels[new_classes_mapping[class_id][0]])))
+                if len(class_id_labels) > 0:
+                    if class_id in class_id_labels.keys():
+                        s = SPACE.join(lab for lab in list(class_id_labels[class_id]))
+                        filehandle.write("label: %s\n" % (s))
                 for repeat_count, node_seq in enumerate(node_seq_list):
-                    joined_res_str = SPACE.join(list(map(lambda node: '(' + str(dict_rel_rev[
-                                                                                    whole_tree.get_edge(node.id)[
-                                                                                        0].weight]) + ') ' + node.form + ' /' + node.pos_tag + '/ ',
-                                                         node_seq)))
+                    joined_res_str = SPACE.join(list(map(lambda node: '(' + str(dict_rel_rev[whole_tree.get_edge(node.id)[0].weight]) + ') ' + node.form + ' /' + node.pos_tag + '/ ', node_seq)))
                     filehandle.write("sent=%s: %s\n" % ('some_sent', joined_res_str))  # WRONG!!!! SENT!!!!
         finally:
             filehandle.close()
