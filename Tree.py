@@ -36,7 +36,6 @@ class Tree:
         self.global_similar_mapping = {}
         self.dict_lemmas = {}
         self.dict_lemmas_rev = []
-        self.node_id_sent = {}
 
     @staticmethod
     def copy_node_details(existing_node, id_count):

@@ -10,7 +10,7 @@ from stellargraph.data import BiasedRandomWalk
 
 from Util import label_lemmas
 import nltk
-nltk.download("stopwords")
+# nltk.download("stopwords")
 from nltk.corpus import stopwords
 
 pattern = re.compile('^#.+$')

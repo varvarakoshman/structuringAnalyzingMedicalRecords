@@ -40,4 +40,4 @@ SPACE = " "
 UNDERSCORE = '_'
 NEW_LINE = "\n"
 
-WORD_LIMIT = 8
+WORD_LIMIT = 3  # 5

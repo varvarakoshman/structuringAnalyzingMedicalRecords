@@ -39,8 +39,6 @@ def read_data():
     # long_df = []
     unique_sents = {}
     for file in files:
-        if file == 'Store':
-            hhh = []
         if file != 'Store':
             full_dir = os.path.join(DATA_PATH, file)
             name = file.split('.')[0]

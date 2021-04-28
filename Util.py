@@ -115,7 +115,7 @@ def label_classes(classes_words, classes_count_passive_verbs):
         else:
             possible_labels = []
         if class_id in classes_count_passive_verbs.keys() and classes_count_passive_verbs[class_id] > 0:
-            possible_labels.append(classes_count_passive_verbs[class_id])
+            possible_labels.append(labels[4])
         class_labels[class_id] = possible_labels
     return class_labels
 
@@ -311,9 +311,14 @@ def write_classes_in_txt(whole_tree, meningful_classes, classes_sents_filtered, 
                     if class_id in class_id_labels.keys():
                         s = SPACE.join(lab for lab in list(class_id_labels[class_id]))
                         filehandle.write("label: %s\n" % (s))
+                # old_ids = new_classes_mapping[class_id]
+                # all_sents =
                 for repeat_count, node_seq in enumerate(node_seq_list):
                     joined_res_str = SPACE.join(list(map(lambda node: '(' + str(dict_rel_rev[whole_tree.get_edge(node.id)[0].weight]) + ') ' + node.form + ' /' + node.pos_tag + '/ ', node_seq)))
-                    filehandle.write("sent=%s: %s\n" % ('some_sent', joined_res_str))  # WRONG!!!! SENT!!!!
+                    try:
+                        filehandle.write("sent=%s: %s\n" % (classes_sents_filtered[class_id][repeat_count], joined_res_str))  # WRONG!!!! SENT!!!!
+                    except IndexError as ke:
+                        gggg = []
         finally:
             filehandle.close()
         count += 1
@@ -489,6 +494,18 @@ def label_data_with_wiki(meaningful_classes_filtered_squashed_sort, dict_form_le
     time_label = 'Временная метка'
     class_id_tokens = {}
     class_extended_repeats = {}
+    # get all existing entities form DB
+    all_ref_entities = get_entity_fields(select_all_ref)
+    all_main_entities = get_entity_fields(select_all_main)
+    label_q_id = {}
+    q_id_categories = {}
+    remember_disambiguated_tokens = {}
+    for tup in all_ref_entities:
+        add_label_to_list(tup, label_q_id)
+    for tup in all_main_entities:
+        add_label_to_list(tup, label_q_id)
+        q_id_categories[tup[0]] = tuple(tup[3:])
+    all_words_in_db = set([word for key in label_q_id.keys() for word in key.split(SPACE)])
     # create search tokens of diff length from class content
     for class_merged_id, class_entries in meaningful_classes_filtered_squashed_sort.items():
         labels = set([class_label for old_id in new_classes_mapping[class_merged_id] for class_label in class_labels[old_id]])
@@ -519,25 +536,16 @@ def label_data_with_wiki(meaningful_classes_filtered_squashed_sort, dict_form_le
             if class_merged_id in class_id_tokens.keys():
                 new_extended_set = set()
                 for repeat in list(class_id_tokens[class_merged_id]):
-                    if len(repeat) > 1:
-                        for i in range(1, len(repeat) + 1):
-                            new_extended_set.update(list(map(lambda x: SPACE.join(x), list(permutations(repeat, i)))))
+                    repeat_filtered = [word for word in repeat if word in all_words_in_db]
+                    if len(repeat_filtered) > 1:
+                        for i in range(1, len(repeat_filtered) + 1):
+                            new_extended_set.update(list(map(lambda x: SPACE.join(x), list(permutations(repeat_filtered, i)))))
                     else:
-                        new_extended_set.add(repeat[0])
+                        if len(repeat_filtered) != 0:
+                            new_extended_set.add(repeat_filtered[0])
                 class_extended_repeats[class_merged_id] = new_extended_set
     # load trained W2V model
     w2v_joined_model = Word2Vec.load('trained_node2vec_joined.model')
-    # get all existing entities form DB
-    label_q_id = {}
-    q_id_categories = {}
-    remember_disambiguated_tokens = {}
-    all_ref_entities = get_entity_fields(select_all_ref)
-    all_main_entities = get_entity_fields(select_all_main)
-    for tup in all_ref_entities:
-        add_label_to_list(tup, label_q_id)
-    for tup in all_main_entities:
-        add_label_to_list(tup, label_q_id)
-        q_id_categories[tup[0]] = tuple(tup[3:])
     class_id_labels = {}
     for class_id, search_tokens in class_extended_repeats.items():
         for search_token in search_tokens:
