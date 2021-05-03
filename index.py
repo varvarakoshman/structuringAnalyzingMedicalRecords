@@ -2,9 +2,11 @@ import time
 import dash_core_components as dcc
 import dash_html_components as html
 import dash_bootstrap_components as dbc
+import dash_table
 from dash.dependencies import Input, Output
 import dash_table as dt
 import plotly.graph_objs as go
+import pandas as pd
 
 from SubTreesClasses import read_data_to_df, annotate_data
 from app import app
@@ -14,7 +16,7 @@ import plotly.express as px
 #     dcc.Location(id='url', refresh=False),
 #     html.Div(id='page-content')
 # ])
-from const.Constants import SPACE
+from const.Constants import SPACE, SEMI_COLON, EMPTY_STR
 
 app.layout = html.Div([
     dbc.Container([
@@ -63,7 +65,7 @@ app.layout = html.Div([
         html.Div(id='algo-time'),
         # html.Br(),
         html.Div(id='label-time'),
-        # html.Br(),
+        html.Br(),
         html.H5("Общая информация: "),
         html.Div(id='num_sentences'),
         # html.Br(),
@@ -95,8 +97,13 @@ app.layout = html.Div([
                     ), ], className='res_hist'),
             ])
         ]),
+        # dash_table.DataTable(id='graph_3', )
+        dbc.Row([
+            dbc.Col(html.H5("Аннотированные классы", className="text-center"),
+                    className="text-center")
+        ]),
         html.Div([
-            dcc.Graph(id='graph_3', style={"height": "55vh", "width": "55vh"}),
+            dcc.Graph(id='graph_3', style={"height": "100vh", "width": "120vh"}),
         ], className='table')
     ])  # TODO: поменять текст, чтобы было красивее!
 ])
@@ -107,7 +114,7 @@ app.layout = html.Div([
               Input("loading-button", "n_clicks"))
 def input_triggers_spinner(n_clicks):
     if n_clicks:
-        overall_time, label_classes_sorted, results_dict, num_sentences, num_classes_labeled = annotate_data()
+        overall_time, label_classes_sorted, results_dict, num_sentences, num_classes_labeled, result_sent_dict, class_id_labels_full = annotate_data()
         label_classes_simple = {k: len(v) for k, v in label_classes_sorted.items()}
         top_30 = list(label_classes_simple.items())[-30:]
         labels = [item[0] for item in top_30]
@@ -130,6 +137,7 @@ def input_triggers_spinner(n_clicks):
                 class_len_dict[v] = 1
             else:
                 class_len_dict[v] += 1
+
         # columns = [
         #     {'name': k.capitalize(), 'id': k}
         #     for k in label_classes_sorted.keys()
@@ -138,13 +146,22 @@ def input_triggers_spinner(n_clicks):
         # layout = go.Layout(title={'text':'30 наиболее частых меток', 'x':0.5, 'xanchor': 'center'}, bargap=0.30)
         # layout_1 = go.Layout(title={'text': 'Число слов в повторе', 'x': 0.5, 'xanchor': 'center'}, bargap=0.30)
         # layout_2 = go.Layout(title={'text': 'Число повторов в классе', 'x': 0.5, 'xanchor': 'center'}, bargap=0.30)
+
         layout = go.Layout(bargap=0.30)
         layout_1 = go.Layout(bargap=0.30)
         layout_2 = go.Layout(bargap=0.30)
+        # num_sentences = 0 # TEST
+        # num_classes_labeled = 0 # TEST
+        # label_classes_simple = {} # TEST
+        # overall_time = [0,0,0,0,0] # TEST
+        # figure = go.Figure({'data': []}) # TEST
+        # figure_1 = go.Figure({'data': []})  # TEST
+        # figure_2 = go.Figure({'data': []})  # TEST
         figure = go.Figure(data=[go.Bar(x=counts,
                                         y=labels,
                                         orientation='h',
                                         marker=dict(color='#20c997', line=dict(color='#49A249', width=3))),],
+                                        # marker=dict(color='#2672F7')),],
                            layout=layout)
         figure_1 = go.Figure(data=[go.Bar(x=list(repeat_len_dict.values()),
                                         y=list(repeat_len_dict.keys()),
@@ -156,6 +173,7 @@ def input_triggers_spinner(n_clicks):
                                         orientation='h',
                                         marker=dict(color='#20c997', line=dict(color='#49A249', width=3))),],
                            layout=layout_2)
+
         # figure_1.update_xaxes(
         #     tickangle=90,
         #     title_text="Month",
@@ -170,8 +188,29 @@ def input_triggers_spinner(n_clicks):
         figure_2.update_xaxes(title_text="Число классов")
         figure_2.update_yaxes(title_text="Число повторов в классе")
 
-        figure_3 = go.Figure(data=[go.Table(header=dict(values=['Метка', 'Имя файла', 'Повтор']),
-                                       cells=dict(values=[[], [], []]))
+        column_classes = []
+        column_labels = []
+        column_sents = []
+        column_repeat = []
+        results_dict_labeled = {k: v for k, v in results_dict.items() if k in class_id_labels_full.keys()} # only labeled classes
+        count = 1
+        for class_id, repeat_list in results_dict_labeled.items():
+            sents = result_sent_dict[class_id]
+            for index, repeat in enumerate(repeat_list):
+                if index == 0:
+                    column_classes.append(str(count))
+                    count += 1
+                else:
+                    column_classes.append(EMPTY_STR)
+                if index == 0:
+                    column_labels.append(SEMI_COLON.join(list(class_id_labels_full[class_id])))
+                else:
+                    column_labels.append(EMPTY_STR)
+                column_sents.append(sents[index])
+                column_repeat.append(repeat)
+
+        figure_3 = go.Figure(data=[go.Table(columnwidth=[5, 10, 6, 15], header=dict(values=['Класс', 'Метка', 'Имя файла', 'Повтор']),
+                                       cells=dict(values=[column_classes, column_labels, column_sents, column_repeat], fill_color='#BEECB5'))
                               ])
 
             # ,title_standoff=25)

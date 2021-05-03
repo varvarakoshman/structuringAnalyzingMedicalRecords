@@ -1,6 +1,8 @@
 import time
 from collections import defaultdict
 from itertools import combinations, product
+import numpy as np
+import matplotlib.pyplot as plt
 
 from Preprocessing import read_data, replace_time_constructions
 from Tree import Tree, Node, Edge
@@ -8,6 +10,7 @@ from Util import merge_in_file, filter_classes, write_classes_in_txt, filter_mea
     label_classes, \
     squash_classes, \
     label_data_with_wiki, get_all_wikidata_entities, construct_db_tree
+from Visualisation import draw_histogram
 from W2Vprocessing import load_trained_word2vec, train_node2vec, train_node2vec_db
 from const.Constants import *
 
@@ -673,13 +676,17 @@ def postprocess_and_label(classes_part, classes_part_list, whole_tree, dict_lemm
     dict_lemmas_full_new_labels = {k: new_labels[v] for k, v in dict_lemmas_full_extended_2.items()}
     meaningful_classes_filtered_squashed, new_classes_mapping = squash_classes(whole_tree, meaningful_classes_filtered, dict_lemmas_full_new_labels, dict_form_lemma_int)
     meaningful_classes_filtered_squashed_sort = dict(sorted(meaningful_classes_filtered_squashed.items(), key=lambda x: len(x[1]), reverse=True))
-    class_id_labels = label_data_with_wiki(meaningful_classes_filtered_squashed_sort, dict_form_lemma_str, class_labels, new_classes_mapping)
-    return meaningful_classes_filtered_squashed_sort, class_id_labels, class_labels
+    class_id_labels, new_class_id_label = label_data_with_wiki(meaningful_classes_filtered_squashed_sort, dict_form_lemma_str, class_labels, new_classes_mapping)
+    return meaningful_classes_filtered_squashed_sort, class_id_labels, new_classes_mapping, new_class_id_label
 
 
 def group_classes_by_labels(class_id_labels, class_labels):
+    class_id_labels_full = class_id_labels.copy()
+    # class_id_labels_full = {}
     label_classes = {}
     for class_id, labels in class_id_labels.items():
+        # if labels is not None:
+        #     class_id_labels_full[class_id] = labels
         for label in labels:
             if label not in label_classes.keys():
                 label_classes[label] = [class_id]
@@ -687,27 +694,43 @@ def group_classes_by_labels(class_id_labels, class_labels):
                 label_classes[label].append(class_id)
     class_labels_filtered = {k: v for k, v in class_labels.items() if len(v) > 0}
     for class_id, labels in class_labels_filtered.items():
-        for label in labels:
-            label_fixed = label.lower()
-            if label_fixed not in label_classes.keys():
-                label_classes[label_fixed] = [class_id]
+        labels_fixed = [label.lower() for label in labels]
+        if class_id not in class_id_labels_full.keys():
+            class_id_labels_full[class_id] = labels
+        else:
+            unique = class_id_labels_full[class_id].union(labels_fixed)
+            class_id_labels_full[class_id] = unique
+            # if unique is not None:
+            #     class_id_labels_full[class_id] = unique
+            # else:
+            #     omg = []
+        for label in labels_fixed:
+            # label_fixed = label.lower()
+            if label not in label_classes.keys():
+                label_classes[label] = [class_id]
             else:
-                label_classes[label_fixed].append(class_id)
+                label_classes[label].append(class_id)
     num_classes_labeled = len(set(list(class_id_labels.keys())).union(set(list(class_labels_filtered.keys()))))
     label_classes_sorted = dict(sorted(label_classes.items(), key=lambda x: len(x[1])))
-    return label_classes_sorted, num_classes_labeled
+    return label_classes_sorted, num_classes_labeled, class_id_labels_full
 
 
-def prepare_results(meaningful_classes):
+def prepare_results(meaningful_classes, classes_sents_filtered):
     results_dict = {}
+    result_sent_dict = {}
     for class_id, node_seq_list in meaningful_classes.items():
-        for node_seq in node_seq_list:
+        for repeat_count, node_seq in enumerate(node_seq_list):
             joined_res_str = SPACE.join(list(map(lambda node: node.form, node_seq)))
+            sent = classes_sents_filtered[class_id][repeat_count]
             if class_id not in results_dict.keys():
                 results_dict[class_id] = [joined_res_str]
             else:
                 results_dict[class_id].append(joined_res_str)
-    return results_dict
+            if class_id not in result_sent_dict.keys():
+                result_sent_dict[class_id] = [sent]
+            else:
+                result_sent_dict[class_id].append(sent)
+    return results_dict, result_sent_dict
 
 
 def annotate_data():
@@ -741,18 +764,56 @@ def annotate_data():
 
     # POSTPROCESSING AND ANNOTATION
     start = time.time()
-    meaningful_classes_filtered_squashed_sort, class_id_labels, class_labels = postprocess_and_label(classes_part, classes_part_list, whole_tree, dict_lemmas_full, trees_df_filtered, remapped_sent)
+    meaningful_classes_filtered_squashed_sort, class_id_labels, new_classes_mapping, new_class_id_label = postprocess_and_label(classes_part, classes_part_list, whole_tree, dict_lemmas_full, trees_df_filtered, remapped_sent)
     postprocess_label_time = (time.time() - start) / 60
 
     # GROUP CLASSES BY LABELS
-    label_classes_sorted, num_classes_labeled = group_classes_by_labels(class_id_labels, class_labels)
-    results_dict = prepare_results(meaningful_classes_filtered_squashed_sort)
+    label_classes_sorted, num_classes_labeled, class_id_labels_full = group_classes_by_labels(class_id_labels, new_class_id_label)
+    remapped_sent_rev = {index: sent_name for sent_name, index in remapped_sent.items()}
+    classes_sents_filtered = {k: list(map(lambda x: remapped_sent_rev[x[0].sent_name], v)) for k, v in meaningful_classes_filtered_squashed_sort.items()}
+    results_dict, result_sent_dict = prepare_results(meaningful_classes_filtered_squashed_sort, classes_sents_filtered)
 
     overall_time = [reading_time, w2v_time, construct_tree_time, algo_time, postprocess_label_time]
-    return overall_time, label_classes_sorted, results_dict, num_sentences, num_classes_labeled
 
+    # NOT NEEDED FOR RUNTIME
+    # dict_rel_rev = {v: k for k, v in dict_rel.items()}
+    # write_classes_in_txt(whole_tree, meaningful_classes_filtered_squashed_sort, classes_sents_filtered,
+    #                      new_classes_mapping, dict_rel_rev, RESULT_PATH, class_id_labels_full)
+    # merge_in_file(RESULT_PATH, MERGED_PATH)
+    return overall_time, label_classes_sorted, results_dict, num_sentences, num_classes_labeled, result_sent_dict, class_id_labels_full
+
+
+def plot_repeat_len(results_dict):
+    MEDIUM_SIZE = 14
+    BIGGER_SIZE = 16
+
+    # plt.rc('font', size=MEDIUM_SIZE)  # controls default text sizes
+    plt.rc('axes', titlesize=BIGGER_SIZE)  # fontsize of the axes title
+    plt.rc('axes', labelsize=BIGGER_SIZE)  # fontsize of the x and y labels
+    plt.rc('xtick', labelsize=MEDIUM_SIZE)  # fontsize of the tick labels
+    plt.rc('ytick', labelsize=MEDIUM_SIZE)  # fontsize of the tick labels
+    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+    count_dict = {}
+    class_id_len = {k: len(v[0].split(SPACE)) for k, v in results_dict.items()}
+    for class_id, leng in class_id_len.items():
+        if leng not in count_dict.keys():
+            count_dict[leng] = 1
+        else:
+            count_dict[leng] += 1
+    alphab = list(count_dict.values())
+    frequencies = list(count_dict.keys())
+    pos1 = np.arange(len(frequencies))
+    ax1 = plt.axes()
+    ax1.set_xticks(pos1)
+    ax1.set_xticklabels(frequencies)
+    ax1.set_xlabel('Число слов в повторе')
+    ax1.set_ylabel('Число классов')
+    plt.bar(pos1, alphab, width=0.4, color='b')
+    plt.title('Число классов с равным числом слов в повторе')
+    plt.show()
 
 def main():
+    annotate_data()
     # whole_tree_plain = construct_db_tree()
     # label_data_with_wiki()
     # merge_in_file()

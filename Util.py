@@ -299,20 +299,18 @@ def write_all_lemmas(all_lemmas):
 
 
 def write_classes_in_txt(whole_tree, meningful_classes, classes_sents_filtered, new_classes_mapping, dict_rel_rev,
-                         class_labels, path, class_id_labels):
+                          path, class_id_labels_full):
     count = 1
     for class_id, node_seq_list in meningful_classes.items():
         filename = path + '/%s.txt' % (str(count))
         try:
             with open(filename, 'w', encoding='utf-8') as filehandle:
-                if len(class_labels) > 0:  # empty dict comes for useless classes, which are also logged in file
-                    filehandle.write("label: %s\n" % (SPACE.join(str(i) for i in class_labels[new_classes_mapping[class_id][0]])))
-                if len(class_id_labels) > 0:
-                    if class_id in class_id_labels.keys():
-                        s = SPACE.join(lab for lab in list(class_id_labels[class_id]))
+                # if len(class_labels) > 0:  # empty dict comes for useless classes, which are also logged in file
+                #     filehandle.write("label: %s\n" % (SPACE.join(str(i) for i in class_labels[new_classes_mapping[class_id][0]])))
+                if len(class_id_labels_full) > 0:
+                    if class_id in class_id_labels_full.keys():
+                        s = SPACE.join(lab for lab in list(class_id_labels_full[class_id]))
                         filehandle.write("label: %s\n" % (s))
-                # old_ids = new_classes_mapping[class_id]
-                # all_sents =
                 for repeat_count, node_seq in enumerate(node_seq_list):
                     joined_res_str = SPACE.join(list(map(lambda node: '(' + str(dict_rel_rev[whole_tree.get_edge(node.id)[0].weight]) + ') ' + node.form + ' /' + node.pos_tag + '/ ', node_seq)))
                     try:
@@ -506,9 +504,14 @@ def label_data_with_wiki(meaningful_classes_filtered_squashed_sort, dict_form_le
         add_label_to_list(tup, label_q_id)
         q_id_categories[tup[0]] = tuple(tup[3:])
     all_words_in_db = set([word for key in label_q_id.keys() for word in key.split(SPACE)])
+    new_classid_label = {}
     # create search tokens of diff length from class content
     for class_merged_id, class_entries in meaningful_classes_filtered_squashed_sort.items():
         labels = set([class_label for old_id in new_classes_mapping[class_merged_id] for class_label in class_labels[old_id]])
+        if class_merged_id not in new_classid_label.keys():
+            new_classid_label[class_merged_id] = labels
+        else:
+            new_classid_label[class_merged_id].update(labels)
         if time_label not in labels:
             for class_entry in class_entries:
                 words = [dict_form_lemma_str[node.form] for node in class_entry]
@@ -564,7 +567,7 @@ def label_data_with_wiki(meaningful_classes_filtered_squashed_sort, dict_form_le
                         class_id_labels[class_id] = {most_probable}
                     else:
                         class_id_labels[class_id].add(most_probable)
-    return class_id_labels
+    return class_id_labels, new_classid_label
 
 
 def pick_first_category(q_id_categories, q_id):

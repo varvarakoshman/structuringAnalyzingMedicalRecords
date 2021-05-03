@@ -39,5 +39,6 @@ COMMA = ','
 SPACE = " "
 UNDERSCORE = '_'
 NEW_LINE = "\n"
+SEMI_COLON = '; '
 
-WORD_LIMIT = 3  # 5
+WORD_LIMIT = 8  # 5

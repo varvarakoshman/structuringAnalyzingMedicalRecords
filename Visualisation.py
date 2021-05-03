@@ -26,7 +26,7 @@ from gensim.models import Word2Vec
 from matplotlib import pyplot
 from sklearn.manifold import TSNE
 
-from const.Constants import EMPTY_STR, NEW_LINE, VIS_PATH_N2V, ALGO_RESULT_N2V_FILT
+from const.Constants import EMPTY_STR, NEW_LINE, VIS_PATH_N2V, ALGO_RESULT_N2V_FILT, ALGO_RESULT_N2V
 from Preprocessing import replace_time_constructions, read_data, read_vidal
 
 
@@ -116,7 +116,7 @@ def draw_histogram():
     # plt.rc('legend', fontsize=BIGGER_SIZE)  # legend fontsize
     plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
     # plt.rc('title', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-    path = ALGO_RESULT_N2V_FILT
+    path = ALGO_RESULT_N2V
     try:
         with open(path, encoding='utf-8') as reader:
             class_entries = reader.readlines()
@@ -151,20 +151,23 @@ def draw_histogram():
         else:
             res_len[val] += 1
 
-    res2 = dict(sorted(res.items(), key=lambda x: x[0]))
-    alphab = list(res2.values())
-    frequencies = list(res2.keys())
+    # res2 = dict(sorted(res.items(), key=lambda x: x[0]))
+    # alphab = list(res2.values())
+    # frequencies = list(res2.keys())
 
-    pos = np.arange(len(frequencies))
-    ax = plt.axes()
-    ax.set_xticks(pos)
-    ax.set_xticklabels(frequencies)
-    ax.set_xlabel('Число повторов в классе')
-    ax.set_ylabel('Число классов')
-    plt.xticks(rotation=45)
-    plt.bar(pos, alphab, width=0.9, color='b')
-    plt.title('Число классов с равным числом повторов')
-    plt.show()
+    # pos = np.arange(len(frequencies))
+    # ax = plt.axes()
+    # ax.set_xticks(pos)
+    # ax.set_xticklabels(frequencies)
+    # ax.set_xlabel('Число повторов в классе')
+    # ax.set_ylabel('Число классов')
+    # plt.xticks(rotation=45)
+    # plt.bar(pos, alphab, width=0.9, color='b')
+    # plt.title('Число классов с равным числом повторов')
+    # for index, label in enumerate(ax.xaxis.get_ticklabels()):
+    #     if index % 3 != 0:
+    #         label.set_visible(False)
+    # plt.show()
 
     res_len = dict(sorted(res_len.items(), key=lambda x: x[0]))
     alphab = list(res_len.values())
