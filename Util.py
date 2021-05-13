@@ -8,7 +8,10 @@ import os
 import re
 from collections import defaultdict
 from itertools import permutations
-
+import networkx as nx
+import netgraph  # pip install netgraph
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from gensim.models import Word2Vec
 
@@ -628,12 +631,133 @@ def get_russian_match(entity):
 
 def construct_db_tree(all_wikidata_entities):
     all_edges = []
+    all_db_labels = {}
+    edge_labels = {}
+    count = 0
     for wikidata_entity in all_wikidata_entities:
-        parents = [wikidata_entity.instance_of, wikidata_entity.subclass_of, wikidata_entity.part_of]
+        parents = {wikidata_entity.instance_of: "instance of",
+                   wikidata_entity.subclass_of: "subclass of",
+                   wikidata_entity.part_of: "part of"}
+        # parents = [wikidata_entity.instance_of, wikidata_entity.subclass_of, wikidata_entity.part_of]
         labels = [wikidata_entity.label] + wikidata_entity.aliases
         for name in labels:
-            for parent in parents:
+            if name not in all_db_labels.keys():
+                all_db_labels[name] = count
+                count += 1
+            name_remapped = all_db_labels[name]
+            for parent, weight in parents.items():
                 if parent != EMPTY_STR:
-                    all_edges.append(Edge(parent, name))
-    return all_edges
+                    if parent not in all_db_labels.keys():
+                        all_db_labels[parent] = count
+                        count += 1
+                    parent_remapped = all_db_labels[parent]
+                    edge = tuple([parent, name])
+                    all_edges.append(edge)
+                    edge_labels[edge] = weight
+                    # all_edges.append(Edge(parent_remapped, name_remapped))
+    all_edges = all_edges
+    return all_edges, edge_labels
+
+
+def draw_db_network(db_tree_edges, edge_labels):
+    # Graph creation:
+    G = nx.Graph(type="")
+
+    for i in range(6):
+        G.add_node(i, shape="o")
+
+    # Changing shape for two nodes
+    G.nodes[1]['shape'] = "v"
+    G.nodes[5]['shape'] = "v"
+
+    # Add edges
+    G.add_edge(1, 2)
+    G.add_edge(4, 5)
+    G.add_edge(0, 4)
+    G.add_edge(2, 3)
+    G.add_edge(2, 4)
+
+    labs = {(1, 2): "1 to 2"}
+    # Get node shapes
+    node_shapes = nx.get_node_attributes(G, "shape")
+
+    # Create an interactive plot.
+    # NOTE: you must retain a reference to the object instance!
+    # Otherwise the whole thing will be garbage collected after the initial draw
+    # and you won't be able to move the plot elements around.
+
+    pos = nx.layout.spring_layout(G)
+
+    ######## drag nodes around #########
+
+    # To access the new node positions:
+    netgraph.InteractiveGraph(G,
+                              node_shape=node_shapes,
+                              node_positions=pos,
+                              edge_positions=pos,
+                              edge_labels=labs)
+
+
+
+
+    # edges_list = [tuple([edge.node_from, edge.node_to]) for edge in db_tree_edges]
+    # total_n_nodes = len(set([label for edge in edges_list for label in edge]))
+    # G = nx.cubical_graph()
+    # G = nx.Graph()
+    # for edge in db_tree_edges:
+    #     G.add_edge(edge.node_from, edge.node_to)
+    # nx.draw(G)  # тип по умолчанию spring_layout
+    # nx.draw(G, pos=nx.spectral_layout(G), nodecolor='r', edge_color='b')
+
+    graph = nx.DiGraph()
+    # G = nx.cubical_graph()
+    edges_list = list(db_tree_edges)[:50]
+    graph.add_edges_from(edges_list)
+    # pos = nx.spring_layout(G)
+    # nx.draw_networkx_nodes(G, pos, cmap=plt.get_cmap('jet'),
+    #                        node_color='r', node_size=50)
+    # nx.draw_networkx_labels(G, pos, font_size=10, horizontalalignment="right")
+    # nx.draw_networkx_edges(G, pos, edgelist=edges_list, edge_color='r', arrows=False)
+    # # nx.draw_networkx_edges(G, pos, edgelist=black_edges, arrows=False)
+    # plt.show()
+
+    # decide on a layout
+    # pos = nx.layout.spring_layout(graph)
+    #
+    # # Create an interactive plot.
+    # # NOTE: you must retain a reference to the object instance!
+    # # Otherwise the whole thing will be garbage collected after the initial draw
+    # # and you won't be able to move the plot elements around.
+    # plot_instance = netgraph.InteractiveGraph(graph, node_positions=pos)
+    # ######## drag nodes around #########
+    #
+    # # To access the new node positions:
+    # node_positions = plot_instance.node_positions
+    # netgraph.InteractiveGraph(graph,
+    #                           node_positions=pos,
+    #                           edge_positions=pos)
+
+    # Graph creation:
+
+    # labs = {(1, 2): "1 to 2"}
+
+    # Create an interactive plot.
+    # NOTE: you must retain a reference to the object instance!
+    # Otherwise the whole thing will be garbage collected after the initial draw
+    # and you won't be able to move the plot elements around.
+
+    pos = nx.layout.spring_layout(graph)
+
+    ######## drag nodes around #########
+
+    # To access the new node positions:
+    # plot_instance = netgraph.InteractiveGraph(G, node_shape=node_shapes, node_positions=pos, edge_positions=pos)
+    netgraph.InteractiveGraph(graph,
+                              node_positions=pos,
+                              edge_positions=pos,)
+                              # edge_labels=edge_labels)
+
+    # node_positions = plot_instance.node_positions
+    # edge_positions = plot_instance.edge_positions
+    gggg =[]
 

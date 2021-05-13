@@ -9,7 +9,7 @@ from Tree import Tree, Node, Edge
 from Util import merge_in_file, filter_classes, write_classes_in_txt, filter_meaningless_classes, get_all_words, \
     label_classes, \
     squash_classes, \
-    label_data_with_wiki, get_all_wikidata_entities, construct_db_tree
+    label_data_with_wiki, get_all_wikidata_entities, construct_db_tree, draw_db_network
 from Visualisation import draw_histogram
 from W2Vprocessing import load_trained_word2vec, train_node2vec, train_node2vec_db
 from const.Constants import *
@@ -812,7 +812,10 @@ def plot_repeat_len(results_dict):
     plt.title('Число классов с равным числом слов в повторе')
     plt.show()
 
+
 def main():
+    db_tree_edges, edge_labels = construct_db_tree(get_all_wikidata_entities())
+    draw_db_network(db_tree_edges, edge_labels)
     annotate_data()
     # whole_tree_plain = construct_db_tree()
     # label_data_with_wiki()
