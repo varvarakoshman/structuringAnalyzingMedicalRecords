@@ -310,9 +310,10 @@ def write_classes_in_txt(whole_tree, meningful_classes, classes_sents_filtered, 
             with open(filename, 'w', encoding='utf-8') as filehandle:
                 # if len(class_labels) > 0:  # empty dict comes for useless classes, which are also logged in file
                 #     filehandle.write("label: %s\n" % (SPACE.join(str(i) for i in class_labels[new_classes_mapping[class_id][0]])))
+                # filehandle.write("class_id: %s\n" % (str(class_id)))
                 if len(class_id_labels_full) > 0:
                     if class_id in class_id_labels_full.keys():
-                        s = SPACE.join(lab for lab in list(class_id_labels_full[class_id]))
+                        s = COMMA.join(lab for lab in list(class_id_labels_full[class_id]))
                         filehandle.write("label: %s\n" % (s))
                 for repeat_count, node_seq in enumerate(node_seq_list):
                     joined_res_str = SPACE.join(list(map(lambda node: '(' + str(dict_rel_rev[whole_tree.get_edge(node.id)[0].weight]) + ') ' + node.form + ' /' + node.pos_tag + '/ ', node_seq)))
@@ -492,7 +493,6 @@ def add_label_to_list(tup, label_q_id):
 
 
 def label_data_with_wiki(meaningful_classes_filtered_squashed_sort, dict_form_lemma_str, class_labels, new_classes_mapping):
-    time_label = 'Временная метка'
     class_id_tokens = {}
     class_extended_repeats = {}
     # get all existing entities form DB
@@ -515,56 +515,59 @@ def label_data_with_wiki(meaningful_classes_filtered_squashed_sort, dict_form_le
             new_classid_label[class_merged_id] = labels
         else:
             new_classid_label[class_merged_id].update(labels)
-        if time_label not in labels:
-            for class_entry in class_entries:
-                words = [dict_form_lemma_str[node.form] for node in class_entry]
-                pos_tags = [node.pos_tag for node in class_entry]
-                if 'N' in pos_tags:
-                    filtered_indices = [i for i, x in enumerate(pos_tags) if x == 'N' or x == 'A']
-                    start_index = 0
-                    subseqs = set()
-                    if len(filtered_indices) > 0:
-                        curr_len = 1
-                        for i in range(0, len(filtered_indices) - 1):
-                            if filtered_indices[i + 1] - filtered_indices[i] == 1:
-                                curr_len += 1
-                            else:
-                                target_indices = filtered_indices[start_index:start_index + curr_len]
-                                word_seq = tuple(set([words[index] for index in target_indices]))
-                                subseqs.add(word_seq)
-                                start_index = curr_len
-                                curr_len = 1
-                        subseqs.add(tuple([words[index] for index in filtered_indices[start_index:start_index + curr_len]]))
-                    if class_merged_id not in class_id_tokens.keys():
-                        class_id_tokens[class_merged_id] = subseqs
-                    else:
-                        class_id_tokens[class_merged_id].update(subseqs)
-            if class_merged_id in class_id_tokens.keys():
-                new_extended_set = set()
-                for repeat in list(class_id_tokens[class_merged_id]):
-                    repeat_filtered = [word for word in repeat if word in all_words_in_db]
-                    if len(repeat_filtered) > 1:
-                        for i in range(1, len(repeat_filtered) + 1):
-                            new_extended_set.update(list(map(lambda x: SPACE.join(x), list(permutations(repeat_filtered, i)))))
-                    else:
-                        if len(repeat_filtered) != 0:
-                            new_extended_set.add(repeat_filtered[0])
-                class_extended_repeats[class_merged_id] = new_extended_set
+        # if time_label not in labels:
+        for class_entry in class_entries:
+            words = [dict_form_lemma_str[node.form] for node in class_entry]
+            pos_tags = [node.pos_tag for node in class_entry]
+            if 'N' in pos_tags:
+                filtered_indices = [i for i, x in enumerate(pos_tags) if x == 'N' or x == 'A']
+                start_index = 0
+                subseqs = set()
+                if len(filtered_indices) > 0:
+                    curr_len = 1
+                    for i in range(0, len(filtered_indices) - 1):
+                        if filtered_indices[i + 1] - filtered_indices[i] == 1:
+                            curr_len += 1
+                        else:
+                            target_indices = filtered_indices[start_index:start_index + curr_len]
+                            word_seq = tuple(set([words[index] for index in target_indices]))
+                            subseqs.add(word_seq)
+                            start_index = curr_len
+                            curr_len = 1
+                    subseqs.add(tuple([words[index] for index in filtered_indices[start_index:start_index + curr_len]]))
+                if class_merged_id not in class_id_tokens.keys():
+                    class_id_tokens[class_merged_id] = subseqs
+                else:
+                    class_id_tokens[class_merged_id].update(subseqs)
+        if class_merged_id in class_id_tokens.keys():
+            new_extended_set = set()
+            for repeat in list(class_id_tokens[class_merged_id]):
+                repeat_filtered = [word for word in repeat if word in all_words_in_db]
+                if len(repeat_filtered) > 1:
+                    for i in range(1, len(repeat_filtered) + 1):
+                        new_extended_set.update(
+                            list(map(lambda x: SPACE.join(x), list(permutations(repeat_filtered, i)))))
+                else:
+                    if len(repeat_filtered) != 0:
+                        new_extended_set.add(repeat_filtered[0])
+            class_extended_repeats[class_merged_id] = new_extended_set
     # load trained W2V model
-    w2v_joined_model = Word2Vec.load('trained_node2vec_joined.model')
+    w2v_joined_model = Word2Vec.load('trained_node2vec_joined_2.model')
     class_id_labels = {}
     for class_id, search_tokens in class_extended_repeats.items():
         for search_token in search_tokens:
             if search_token in label_q_id.keys():
+                if search_token == 'боль':
+                    hhh = []
                 q_ids = list(label_q_id[search_token])
                 if len(q_ids) > 1:
                     if search_token not in remember_disambiguated_tokens.keys():
-                        most_probable = disambiguate(w2v_joined_model, q_id_categories, q_ids, search_token)
+                        most_probable = disambiguate_entities(w2v_joined_model, q_id_categories, q_ids, search_token)
                         remember_disambiguated_tokens[search_token] = most_probable
                     else:
                         most_probable = remember_disambiguated_tokens[search_token]
                 else:
-                    most_probable = pick_first_category(q_id_categories, q_ids[0])
+                    most_probable = pick_first_category(w2v_joined_model, q_id_categories, q_ids[0], search_token)
                 if most_probable != EMPTY_STR:
                     if class_id not in class_id_labels.keys():
                         class_id_labels[class_id] = {most_probable}
@@ -573,30 +576,77 @@ def label_data_with_wiki(meaningful_classes_filtered_squashed_sort, dict_form_le
     return class_id_labels, new_classid_label
 
 
-def pick_first_category(q_id_categories, q_id):
+def pick_first_category(w2v_joined_model, q_id_categories, q_id, search_token):
     categories = q_id_categories[q_id]
     instance_of = categories[0]
     subclass_of = categories[1]
     part_of = categories[2]
     most_probable = EMPTY_STR
     if instance_of != EMPTY_STR:
-        most_probable = get_russian_match(instance_of)
+        most_probable = get_russian_match(w2v_joined_model, instance_of, search_token)
     elif subclass_of != EMPTY_STR:
-        most_probable = get_russian_match(subclass_of)
+        most_probable = get_russian_match(w2v_joined_model, subclass_of, search_token)
     elif part_of != EMPTY_STR:
-        most_probable = get_russian_match(part_of)
+        most_probable = get_russian_match(w2v_joined_model, part_of, search_token)
     return most_probable
 
 
-def disambiguate(w2v_joined_model, q_id_categories, q_ids, search_token):
+def disambiguate_meanings(w2v_joined_model, possible_options, search_token):
+    possible_labels_similarity_score = {}
+    for possible_label in possible_options:
+        possible_label = possible_label.strip()
+        if possible_label in w2v_joined_model.wv.vocab:
+            try:
+                possible_labels_similarity_score[possible_label] = w2v_joined_model.wv.similarity(possible_label, search_token)
+            except KeyError as ke:
+                gg = []
+    options_sorted = dict(sorted(possible_labels_similarity_score.items(), key=operator.itemgetter(1), reverse=True))
+    if len(options_sorted) > 0:
+        most_probable = next(iter(options_sorted))
+    else:
+        most_probable = EMPTY_STR
+    return most_probable
+
+
+def disambiguate_entities(w2v_joined_model, q_id_categories, q_ids, search_token):
     possible_labels_similarity_score = {}
     for q_id in q_ids:
-        possible_label = pick_first_category(q_id_categories, q_id)
-        if possible_label != EMPTY_STR:
-            possible_labels_similarity_score[possible_label] = w2v_joined_model.wv.similarity(possible_label, search_token)
-    most_probable = next(iter(dict(sorted(possible_labels_similarity_score.items(), key=operator.itemgetter(1), reverse=True))))
+        possible_label = pick_first_category(w2v_joined_model, q_id_categories, q_id, search_token)
+        if possible_label != EMPTY_STR and possible_label in w2v_joined_model.wv.vocab:
+            try:
+                possible_labels_similarity_score[possible_label] = w2v_joined_model.wv.similarity(possible_label, search_token)
+            except KeyError as ke:
+                gg = []
+    options_sorted = dict(sorted(possible_labels_similarity_score.items(), key=operator.itemgetter(1), reverse=True))
+    if len(options_sorted) > 0:
+        most_probable = next(iter(options_sorted))
+    else:
+        most_probable = EMPTY_STR
     return most_probable
 
+
+# def get_all_wikidata_entities(label_getter):
+#     all_ref_entities = get_entity_fields(select_all_ref)
+#     q_id_aliases = {}
+#     for tup in all_ref_entities:
+#         q_id = tup[0]
+#         label = label_getter(tup)
+#         if q_id not in q_id_aliases.keys():
+#             q_id_aliases[q_id] = [label]
+#         else:
+#             q_id_aliases[q_id].append(label)
+#     all_main_entities = get_entity_fields(select_all_main)
+#     all_wikidata_entities = []
+#     for main_entity in all_main_entities:
+#         q_id = main_entity[0]
+#         aliases = q_id_aliases[q_id] if q_id in q_id_aliases.keys() else []
+#         instance_of = get_russian_match(main_entity[3]) if main_entity[3] != EMPTY_STR else EMPTY_STR
+#         subclass_of = get_russian_match(main_entity[4]) if main_entity[4] != EMPTY_STR else EMPTY_STR
+#         part_of = get_russian_match(main_entity[5]) if main_entity[5] != EMPTY_STR else EMPTY_STR
+#         wikidata_entity = WikidataEntity(q_id, label=label_getter(main_entity), instance_of=instance_of,
+#                                          subclass_of=subclass_of, part_of=part_of, aliases=aliases)
+#         all_wikidata_entities.append(wikidata_entity)
+#     return all_wikidata_entities
 
 def get_all_wikidata_entities():
     all_ref_entities = get_entity_fields(select_all_ref)
@@ -613,20 +663,31 @@ def get_all_wikidata_entities():
     for main_entity in all_main_entities:
         q_id = main_entity[0]
         aliases = q_id_aliases[q_id] if q_id in q_id_aliases.keys() else []
-        instance_of = get_russian_match(main_entity[3]) if main_entity[3] != EMPTY_STR else EMPTY_STR
-        subclass_of = get_russian_match(main_entity[4]) if main_entity[4] != EMPTY_STR else EMPTY_STR
-        part_of = get_russian_match(main_entity[5]) if main_entity[5] != EMPTY_STR else EMPTY_STR
+        instance_of = get_split_russian(main_entity[3]) if main_entity[3] != EMPTY_STR else EMPTY_STR
+        subclass_of = get_split_russian(main_entity[4]) if main_entity[4] != EMPTY_STR else EMPTY_STR
+        part_of = get_split_russian(main_entity[5]) if main_entity[5] != EMPTY_STR else EMPTY_STR
         wikidata_entity = WikidataEntity(q_id, label=main_entity[2], instance_of=instance_of,
                                          subclass_of=subclass_of, part_of=part_of, aliases=aliases)
         all_wikidata_entities.append(wikidata_entity)
     return all_wikidata_entities
 
 
-def get_russian_match(entity):
+def get_split_russian(entity):
+    possible_options = []
     for tag in entity.split(COMMA):
         if has_russian_letters.match(tag):
-            return tag
-    return EMPTY_STR
+            possible_options.append(tag)
+    return possible_options
+
+
+def get_russian_match(w2v_joined_model, entity, search_token):
+    possible_options = get_split_russian(entity)
+    if len(possible_options) > 1:
+        return disambiguate_meanings(w2v_joined_model, possible_options, search_token)
+    elif len(possible_options) == 1:
+        return possible_options[0].strip()
+    else:
+        return EMPTY_STR
 
 
 def construct_db_tree(all_wikidata_entities):
@@ -635,71 +696,31 @@ def construct_db_tree(all_wikidata_entities):
     edge_labels = {}
     count = 0
     for wikidata_entity in all_wikidata_entities:
-        parents = {wikidata_entity.instance_of: "instance of",
-                   wikidata_entity.subclass_of: "subclass of",
-                   wikidata_entity.part_of: "part of"}
+        parents = {
+            "instance of": wikidata_entity.instance_of,
+            "subclass of": wikidata_entity.subclass_of,
+            "part of": wikidata_entity.part_of
+        }
         # parents = [wikidata_entity.instance_of, wikidata_entity.subclass_of, wikidata_entity.part_of]
         labels = [wikidata_entity.label] + wikidata_entity.aliases
         for name in labels:
             if name not in all_db_labels.keys():
                 all_db_labels[name] = count
                 count += 1
-            name_remapped = all_db_labels[name]
-            for parent, weight in parents.items():
-                if parent != EMPTY_STR:
-                    if parent not in all_db_labels.keys():
-                        all_db_labels[parent] = count
-                        count += 1
-                    parent_remapped = all_db_labels[parent]
-                    edge = tuple([parent, name])
-                    all_edges.append(edge)
-                    edge_labels[edge] = weight
-                    # all_edges.append(Edge(parent_remapped, name_remapped))
+            for weight, parnts in parents.items():
+                if len(parnts) > 0:
+                    for parent in parnts:
+                        if parent not in all_db_labels.keys():
+                            all_db_labels[parent] = count
+                            count += 1
+                        edge = tuple([parent, name])
+                        all_edges.append(Edge(parent, name))
+                        edge_labels[edge] = weight
     all_edges = all_edges
-    return all_edges, edge_labels
+    return all_edges, edge_labels, all_db_labels
 
 
-def draw_db_network(db_tree_edges, edge_labels):
-    # Graph creation:
-    G = nx.Graph(type="")
-
-    for i in range(6):
-        G.add_node(i, shape="o")
-
-    # Changing shape for two nodes
-    G.nodes[1]['shape'] = "v"
-    G.nodes[5]['shape'] = "v"
-
-    # Add edges
-    G.add_edge(1, 2)
-    G.add_edge(4, 5)
-    G.add_edge(0, 4)
-    G.add_edge(2, 3)
-    G.add_edge(2, 4)
-
-    labs = {(1, 2): "1 to 2"}
-    # Get node shapes
-    node_shapes = nx.get_node_attributes(G, "shape")
-
-    # Create an interactive plot.
-    # NOTE: you must retain a reference to the object instance!
-    # Otherwise the whole thing will be garbage collected after the initial draw
-    # and you won't be able to move the plot elements around.
-
-    pos = nx.layout.spring_layout(G)
-
-    ######## drag nodes around #########
-
-    # To access the new node positions:
-    netgraph.InteractiveGraph(G,
-                              node_shape=node_shapes,
-                              node_positions=pos,
-                              edge_positions=pos,
-                              edge_labels=labs)
-
-
-
-
+def draw_db_network(db_tree_edges, edge_labels, all_db_labels):
     # edges_list = [tuple([edge.node_from, edge.node_to]) for edge in db_tree_edges]
     # total_n_nodes = len(set([label for edge in edges_list for label in edge]))
     # G = nx.cubical_graph()
@@ -709,17 +730,40 @@ def draw_db_network(db_tree_edges, edge_labels):
     # nx.draw(G)  # тип по умолчанию spring_layout
     # nx.draw(G, pos=nx.spectral_layout(G), nodecolor='r', edge_color='b')
 
-    graph = nx.DiGraph()
+    G = nx.Graph()
     # G = nx.cubical_graph()
     edges_list = list(db_tree_edges)[:50]
-    graph.add_edges_from(edges_list)
-    # pos = nx.spring_layout(G)
-    # nx.draw_networkx_nodes(G, pos, cmap=plt.get_cmap('jet'),
-    #                        node_color='r', node_size=50)
-    # nx.draw_networkx_labels(G, pos, font_size=10, horizontalalignment="right")
-    # nx.draw_networkx_edges(G, pos, edgelist=edges_list, edge_color='r', arrows=False)
-    # # nx.draw_networkx_edges(G, pos, edgelist=black_edges, arrows=False)
-    # plt.show()
+    # edges_list = [edge for edge in edges_list_init if edge[0] != 'таксон' and edge[0] != 'часть' and edge[0] != 'часть молекулы' and edge[0] != 'монотипия' and edge[0] != 'домашнее животное'
+    #               and edge[1] != 'волейбол' and edge[0] != 'часть тела животного' and edge[0] != 'фазовый переход' and edge[0] != 'физический процесс' and edge[1] != 'неформальная экономика']
+    # # edges_list = list(set([edge for edge in db_tree_edges if edge[0] == 'терапия' or edge[0] == 'атидепрессант' or edge[0] == 'заболевание'
+    #                         or edge[0] == 'медицинская процедура' or edge[0] == 'вирусное заболевание']))[:50]
+    edge_labels_50 = {edge: edge_labels[edge] for edge in edges_list}
+    with open(EXCEL_EDGES_GEPHI_PATH, "w", newline='', encoding='utf-8') as csv_file_1, open(
+            EXCEL_NODES_GEPHI_PATH, "w", newline='', encoding='utf-8') as csv_file_2:
+        writer_1 = csv.writer(csv_file_1, delimiter=',')
+        writer_2 = csv.writer(csv_file_2, delimiter=',')
+        writer_1.writerow(['Source', 'Target', 'Label'])
+        writer_2.writerow(['Id', 'Label'])
+        nodes = {}
+        for edge, edge_label in edge_labels_50.items():
+            node_id_1 = all_db_labels[edge[0]]
+            node_id_2 = all_db_labels[edge[1]]
+            writer_1.writerow([node_id_1, node_id_2, edge_label])
+            if node_id_1 not in nodes.keys():
+                nodes[node_id_1] = edge[0]
+            if node_id_2 not in nodes.keys():
+                nodes[node_id_2] = edge[1]
+        for node_id, node_label in nodes.items():
+            writer_2.writerow([node_id, node_label])
+    G.add_edges_from(edges_list)
+    pos = nx.spring_layout(G)
+    nx.draw_networkx_nodes(G, pos, cmap=plt.get_cmap('jet'),
+                           node_color='red', node_size=30)
+    nx.draw_networkx_labels(G, pos, font_size=13, horizontalalignment="right")
+    nx.draw_networkx_edges(G, pos, edgelist=edges_list, edge_color='black', arrows=False)
+    # nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels_50, font_color='black', font_size=8)
+    # nx.draw_networkx_edges(G, pos, edgelist=black_edges, arrows=False)
+    plt.show()
 
     # decide on a layout
     # pos = nx.layout.spring_layout(graph)
@@ -746,16 +790,16 @@ def draw_db_network(db_tree_edges, edge_labels):
     # Otherwise the whole thing will be garbage collected after the initial draw
     # and you won't be able to move the plot elements around.
 
-    pos = nx.layout.spring_layout(graph)
-
-    ######## drag nodes around #########
-
-    # To access the new node positions:
-    # plot_instance = netgraph.InteractiveGraph(G, node_shape=node_shapes, node_positions=pos, edge_positions=pos)
-    netgraph.InteractiveGraph(graph,
-                              node_positions=pos,
-                              edge_positions=pos,)
-                              # edge_labels=edge_labels)
+    # pos = nx.layout.spring_layout(graph)
+    #
+    # ######## drag nodes around #########
+    #
+    # # To access the new node positions:
+    # # plot_instance = netgraph.InteractiveGraph(G, node_shape=node_shapes, node_positions=pos, edge_positions=pos)
+    # netgraph.InteractiveGraph(graph,
+    #                           node_positions=pos,
+    #                           edge_positions=pos,)
+    #                           # edge_labels=edge_labels)
 
     # node_positions = plot_instance.node_positions
     # edge_positions = plot_instance.edge_positions

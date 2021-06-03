@@ -1,3 +1,4 @@
+from SubTreesClasses import bfs_deep_similar
 from Tree import Node, Tree, Edge
 
 
@@ -103,3 +104,29 @@ def new_test():
     test_tree.global_similar_mapping = {20: 10, 21: 10, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, 10: 10,
                                         11: 11, 12: 12, 13: 13, 14: 14, 15: 15, 16: 16, 17: 17, 18: 18, 19: 19, 22: 22}
     return test_tree
+
+
+def test():
+    dict_lemmas_full_edit = {
+        0: [1, 2, 3],
+        1: [4, 5, 6],
+        2: [13, 4, 14],
+        3: [15],
+        4: [1, 7],
+        5: [1, 7],
+        6: [2, 8],
+        7: [4, 5, 9],
+        8: [6, 12],
+        9: [10, 11],
+        10: [],
+        11: [],
+        12: [13, 8],
+        13: [],
+        14: [5, 6],
+        15: [16, 7],
+        16: [17, 15],
+        17: [18],
+        18: []
+    }
+    deep_children = bfs_deep_similar(0, dict_lemmas_full_edit)
+    print(deep_children)

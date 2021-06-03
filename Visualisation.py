@@ -26,7 +26,7 @@ from gensim.models import Word2Vec
 from matplotlib import pyplot
 from sklearn.manifold import TSNE
 
-from const.Constants import EMPTY_STR, NEW_LINE, VIS_PATH_N2V, ALGO_RESULT_N2V_FILT, ALGO_RESULT_N2V
+from const.Constants import EMPTY_STR, NEW_LINE, VIS_PATH_N2V, ALGO_RESULT_N2V_FILT, ALGO_RESULT_N2V, MERGED_PATH
 from Preprocessing import replace_time_constructions, read_data, read_vidal
 
 
@@ -116,7 +116,7 @@ def draw_histogram():
     # plt.rc('legend', fontsize=BIGGER_SIZE)  # legend fontsize
     plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
     # plt.rc('title', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-    path = ALGO_RESULT_N2V
+    path = MERGED_PATH
     try:
         with open(path, encoding='utf-8') as reader:
             class_entries = reader.readlines()
@@ -136,7 +136,7 @@ def draw_histogram():
                 class_count += 1
             else:
                 words = [w for w in line.split(':')[1].split(NEW_LINE)[0].split(" ") if w != EMPTY_STR][1::3]
-                curr_len = len(words) // 2 + 1
+                curr_len = len(words)
                 local_c += 1
     res = {}
     for key, val in sorted(group_len.items()):
