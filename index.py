@@ -209,6 +209,14 @@ def input_triggers_spinner(n_clicks):
                 column_sents.append(sents[index])
                 column_repeat.append(repeat)
 
+        figure = go.Figure(data=[go.Bar(x=counts,
+                                        y=labels,
+                                        orientation='h',
+                                        marker=dict(color='#20c997', line=dict(color='#49A249', width=3))), ],
+                           layout=go.Layout(
+                               title=go.layout.Title(text="30 наиболее частых меток")
+                           ))
+
         figure_3 = go.Figure(data=[go.Table(columnwidth=[5, 10, 6, 15], header=dict(values=['Класс', 'Метка', 'Имя файла', 'Повтор']),
                                        cells=dict(values=[column_classes, column_labels, column_sents, column_repeat], fill_color='#BEECB5'))
                               ])

@@ -19,6 +19,9 @@ VIS_PATH_N2V = "medicalTextTrees/merged_extended_visualize_n2v.txt"
 MEDICAL_DICTIONARY = "medicalTextTrees/support_med_data.xls"
 ALL_LEMMAS_PATH_N2V = "medicalTextTrees/all_lemmas_n2v.txt"
 ALL_LEMMAS_PATH_W2V = "medicalTextTrees/all_lemmas_w2v.txt"
+RAW_DATA_PATH = "data/separeted_sentences_txt_extra_7777"
+PARSED_RAW_PAVLOV = "data/parsed_pavlov/"
+PARSED_RAW_PAVLOV_UNIQUE = "data/parsed_pavlov_unique/"
 
 ALGO_RESULT_W2V = "medicalTextTrees/algos_results/merged_extended_w2v.txt"
 ALGO_RESULT_N2V = "medicalTextTrees/algos_results/merged_extended_n2v.txt"
@@ -41,4 +44,15 @@ UNDERSCORE = '_'
 NEW_LINE = "\n"
 SEMI_COLON = '; '
 
-WORD_LIMIT = 8  # 5
+# DEEPPAVLOV SPECIFIC
+PUNCT_RELATION = 'punct'
+NUM_POS = 'NUM'
+ADJ_POS = 'ADJ'
+NOUN_POS = 'NOUN'
+PROPN_POS = 'PROPN'
+
+SENT_NUM = 5000
+WORDS_IN_SENT = 25
+WORD_LIMIT = 5  # 5
+
+# sum({your_key: res2[your_key] for your_key in range(51, max(res2.keys())) if your_key in res2.keys()}.values())

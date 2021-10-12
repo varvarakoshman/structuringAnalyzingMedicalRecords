@@ -283,7 +283,9 @@ def get_all_words(meaningful_classes, dict_form_lemma):
     classes_words = {}
     classes_count_passive_verbs = {}
     for class_id, node_sequences_list in meaningful_classes.items():
-        count_passive_verbs = len(list(filter(lambda node: node.pos_tag == 'V' and node.pos_extended[-3] == 'p',
+        # count_passive_verbs = len(list(filter(lambda node: node.pos_tag == 'V' and node.pos_extended[-3] == 'p',
+        #                                       [node for node_seq in node_sequences_list for node in node_seq])))
+        count_passive_verbs = len(list(filter(lambda node: node.pos_tag == 'VERB' and 'Voice=Pass' in node.pos_extended,
                                               [node for node_seq in node_sequences_list for node in node_seq])))
         classes_count_passive_verbs[class_id] = count_passive_verbs
         words_in_class = set([node.form for node_seq in node_sequences_list for node in node_seq])
@@ -492,20 +494,37 @@ def add_label_to_list(tup, label_q_id):
         label_q_id[norm_label].add(q_id)
 
 
+def add_label_to_list_csv(df, label_q_id, q_id_categories):
+    df_columns = df.columns
+    for index, row in df.iterrows():
+        q_id = row['q_id']
+        label = row['entity_label']
+        norm_label = row['entity_label_normal']
+        if label not in label_q_id.keys():
+            label_q_id[label] = {q_id}
+        else:
+            label_q_id[label].add(q_id)
+        if norm_label not in label_q_id.keys():
+            label_q_id[norm_label] = {q_id}
+        else:
+            label_q_id[norm_label].add(q_id)
+        if 'instance_of' in df_columns:
+            inst = EMPTY_STR if type(row['instance_of']) == float and np.isnan(row['instance_of']) else row['instance_of']
+            sub =  EMPTY_STR if type(row['subclass_of']) == float and np.isnan(row['subclass_of']) else row['subclass_of']
+            part = EMPTY_STR if type(row['part_of']) == float and np.isnan(row['part_of']) else row['part_of']
+            q_id_categories[q_id] = tuple([inst, sub, part])
+
+
 def label_data_with_wiki(meaningful_classes_filtered_squashed_sort, dict_form_lemma_str, class_labels, new_classes_mapping):
     class_id_tokens = {}
     class_extended_repeats = {}
-    # get all existing entities form DB
-    all_ref_entities = get_entity_fields(select_all_ref)
-    all_main_entities = get_entity_fields(select_all_main)
     label_q_id = {}
     q_id_categories = {}
     remember_disambiguated_tokens = {}
-    for tup in all_ref_entities:
-        add_label_to_list(tup, label_q_id)
-    for tup in all_main_entities:
-        add_label_to_list(tup, label_q_id)
-        q_id_categories[tup[0]] = tuple(tup[3:])
+    df_main = pd.read_csv("/Users/vkoschman/PycharmProjects/equalSubtreeProblem/wikidata_main_entities.csv")
+    df_ref = pd.read_csv("/Users/vkoschman/PycharmProjects/equalSubtreeProblem/wikidata_aliases_for_entities.csv")
+    add_label_to_list_csv(df_main, label_q_id, q_id_categories)
+    add_label_to_list_csv(df_ref, label_q_id, q_id_categories)
     all_words_in_db = set([word for key in label_q_id.keys() for word in key.split(SPACE)])
     new_classid_label = {}
     # create search tokens of diff length from class content
@@ -519,8 +538,8 @@ def label_data_with_wiki(meaningful_classes_filtered_squashed_sort, dict_form_le
         for class_entry in class_entries:
             words = [dict_form_lemma_str[node.form] for node in class_entry]
             pos_tags = [node.pos_tag for node in class_entry]
-            if 'N' in pos_tags:
-                filtered_indices = [i for i, x in enumerate(pos_tags) if x == 'N' or x == 'A']
+            if NOUN_POS in pos_tags:
+                filtered_indices = [i for i, x in enumerate(pos_tags) if x == NOUN_POS or x == ADJ_POS]
                 start_index = 0
                 subseqs = set()
                 if len(filtered_indices) > 0:
@@ -552,13 +571,11 @@ def label_data_with_wiki(meaningful_classes_filtered_squashed_sort, dict_form_le
                         new_extended_set.add(repeat_filtered[0])
             class_extended_repeats[class_merged_id] = new_extended_set
     # load trained W2V model
-    w2v_joined_model = Word2Vec.load('trained_node2vec_joined_2.model')
+    w2v_joined_model = Word2Vec.load('trained_node2vec_joined.model')
     class_id_labels = {}
     for class_id, search_tokens in class_extended_repeats.items():
         for search_token in search_tokens:
             if search_token in label_q_id.keys():
-                if search_token == 'боль':
-                    hhh = []
                 q_ids = list(label_q_id[search_token])
                 if len(q_ids) > 1:
                     if search_token not in remember_disambiguated_tokens.keys():
@@ -567,7 +584,7 @@ def label_data_with_wiki(meaningful_classes_filtered_squashed_sort, dict_form_le
                     else:
                         most_probable = remember_disambiguated_tokens[search_token]
                 else:
-                    most_probable = pick_first_category(w2v_joined_model, q_id_categories, q_ids[0], search_token)
+                    most_probable = pick_first_category(q_id_categories, q_ids[0])
                 if most_probable != EMPTY_STR:
                     if class_id not in class_id_labels.keys():
                         class_id_labels[class_id] = {most_probable}
@@ -576,18 +593,18 @@ def label_data_with_wiki(meaningful_classes_filtered_squashed_sort, dict_form_le
     return class_id_labels, new_classid_label
 
 
-def pick_first_category(w2v_joined_model, q_id_categories, q_id, search_token):
+def pick_first_category(q_id_categories, q_id):
     categories = q_id_categories[q_id]
     instance_of = categories[0]
     subclass_of = categories[1]
     part_of = categories[2]
     most_probable = EMPTY_STR
     if instance_of != EMPTY_STR:
-        most_probable = get_russian_match(w2v_joined_model, instance_of, search_token)
+        most_probable = get_russian_match(instance_of)
     elif subclass_of != EMPTY_STR:
-        most_probable = get_russian_match(w2v_joined_model, subclass_of, search_token)
+        most_probable = get_russian_match(subclass_of)
     elif part_of != EMPTY_STR:
-        most_probable = get_russian_match(w2v_joined_model, part_of, search_token)
+        most_probable = get_russian_match(part_of)
     return most_probable
 
 
@@ -611,7 +628,7 @@ def disambiguate_meanings(w2v_joined_model, possible_options, search_token):
 def disambiguate_entities(w2v_joined_model, q_id_categories, q_ids, search_token):
     possible_labels_similarity_score = {}
     for q_id in q_ids:
-        possible_label = pick_first_category(w2v_joined_model, q_id_categories, q_id, search_token)
+        possible_label = pick_first_category(q_id_categories, q_id)
         if possible_label != EMPTY_STR and possible_label in w2v_joined_model.wv.vocab:
             try:
                 possible_labels_similarity_score[possible_label] = w2v_joined_model.wv.similarity(possible_label, search_token)
@@ -680,14 +697,11 @@ def get_split_russian(entity):
     return possible_options
 
 
-def get_russian_match(w2v_joined_model, entity, search_token):
-    possible_options = get_split_russian(entity)
-    if len(possible_options) > 1:
-        return disambiguate_meanings(w2v_joined_model, possible_options, search_token)
-    elif len(possible_options) == 1:
-        return possible_options[0].strip()
-    else:
-        return EMPTY_STR
+def get_russian_match(entity):
+    for tag in entity.split(COMMA):
+        if has_russian_letters.match(tag):
+            return tag
+    return EMPTY_STR
 
 
 def construct_db_tree(all_wikidata_entities):
@@ -804,4 +818,5 @@ def draw_db_network(db_tree_edges, edge_labels, all_db_labels):
     # node_positions = plot_instance.node_positions
     # edge_positions = plot_instance.edge_positions
     gggg =[]
+
 

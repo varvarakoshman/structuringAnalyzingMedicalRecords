@@ -104,6 +104,79 @@ def visualise_classes():
 
 
 def draw_histogram():
+    # alphab = [5071, 3384, 1361, 650, 347, 142]
+    # frequencies = ['2', '3-5', '6-10', '11-20', '21-50', '51-2.6k']
+    # pos = np.arange(len(frequencies))
+    # ax = plt.axes()
+    # ax.set_xticks(pos)
+    # ax.set_xticklabels(frequencies)
+    # ax.set_xlabel('Number of repeats in a group')
+    # ax.set_ylabel('Number of groups')
+    # plt.xticks()
+    # plt.bar(pos, alphab, width=0.9, color='b')
+    # plt.title('Number of groups with equal number of repeats')
+    # plt.show()
+
+    # import re
+    #
+    # MEDIUM_SIZE = 12
+    # BIGGER_SIZE = 14
+    #
+    # # plt.rc('font', size=MEDIUM_SIZE)  # controls default text sizes
+    # plt.rc('axes', titlesize=BIGGER_SIZE)  # fontsize of the axes title
+    # plt.rc('axes', labelsize=BIGGER_SIZE)  # fontsize of the x and y labels
+    # plt.rc('xtick', labelsize=MEDIUM_SIZE)  # fontsize of the tick labels
+    # plt.rc('ytick', labelsize=MEDIUM_SIZE)  # fontsize of the tick labels
+    # # plt.rc('legend', fontsize=BIGGER_SIZE)  # legend fontsize
+    # plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+    # # plt.rc('title', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+    # path = MERGED_PATH
+    # try:
+    #     with open(path, encoding='utf-8') as reader:
+    #         class_entries = reader.readlines()
+    # finally:
+    #     reader.close()
+    # class_count = 1
+    # local_c = 0
+    # curr_len = 0
+    # group_len = {}
+    # str_len = {}
+    # for line in class_entries:
+    #     if not re.match('label*', line):
+    #         if line == NEW_LINE:
+    #             group_len[class_count] = local_c
+    #             str_len[class_count] = curr_len
+    #             local_c = 0
+    #             class_count += 1
+    #         else:
+    #             words = [w for w in line.split(':')[1].split(NEW_LINE)[0].split(" ") if w != EMPTY_STR][1::3]
+    #             curr_len = len(words)
+    #             local_c += 1
+    # res = {}
+    # for key, val in sorted(group_len.items()):
+    #     if val not in res.keys():
+    #         res[val] = 1
+    #     else:
+    #         res[val] += 1
+    #
+    # res2 = dict(sorted(res.items(), key=lambda x: x[0]))
+    # alphab = list(res2.values())
+    # frequencies = list(res2.keys())
+    #
+    # pos = np.arange(len(frequencies))
+    # ax = plt.axes()
+    # ax.set_xticks(pos)
+    # ax.set_xticklabels(frequencies)
+    # ax.set_xlabel('Число повторов в классе', fontsize=12)
+    # ax.set_ylabel('Число классов', fontsize=12)
+    # plt.xticks()
+    # plt.bar(pos, alphab, width=0.9, color='b')
+    # plt.title('Число классов с равным числом повторов', fontsize=12)
+    # for index, label in enumerate(ax.xaxis.get_ticklabels()):
+    #     if index % 10 != 0:
+    #         label.set_visible(False)
+    # plt.show()
+
     SMALL_SIZE = 12
     MEDIUM_SIZE = 14
     BIGGER_SIZE = 16
@@ -151,37 +224,37 @@ def draw_histogram():
         else:
             res_len[val] += 1
 
-    # res2 = dict(sorted(res.items(), key=lambda x: x[0]))
-    # alphab = list(res2.values())
-    # frequencies = list(res2.keys())
+    res2 = dict(sorted(res.items(), key=lambda x: x[0]))
+    alphab = list(res2.values())
+    frequencies = list(res2.keys())
 
-    # pos = np.arange(len(frequencies))
-    # ax = plt.axes()
-    # ax.set_xticks(pos)
-    # ax.set_xticklabels(frequencies)
-    # ax.set_xlabel('Число повторов в классе')
-    # ax.set_ylabel('Число классов')
-    # plt.xticks(rotation=45)
-    # plt.bar(pos, alphab, width=0.9, color='b')
-    # plt.title('Число классов с равным числом повторов')
-    # for index, label in enumerate(ax.xaxis.get_ticklabels()):
-    #     if index % 3 != 0:
-    #         label.set_visible(False)
-    # plt.show()
-
-    res_len = dict(sorted(res_len.items(), key=lambda x: x[0]))
-    alphab = list(res_len.values())
-    frequencies = list(res_len.keys())
-
-    pos1 = np.arange(len(frequencies))
-    ax1 = plt.axes()
-    ax1.set_xticks(pos1)
-    ax1.set_xticklabels(frequencies)
-    ax1.set_xlabel('Число слов в повторе')
-    ax1.set_ylabel('Число классов')
-    plt.bar(pos1, alphab, width=0.4, color='b')
-    plt.title('Число классов с равным числом слов в повторе')
+    pos = np.arange(len(frequencies))
+    ax = plt.axes()
+    ax.set_xticks(pos)
+    ax.set_xticklabels(frequencies)
+    ax.set_xlabel('Число повторов в классе')
+    ax.set_ylabel('Число классов')
+    plt.xticks()
+    plt.bar(pos, alphab, width=0.9, color='b')
+    plt.title('Число классов с равным числом повторов')
+    for index, label in enumerate(ax.xaxis.get_ticklabels()):
+        if index % 5 != 0:
+            label.set_visible(False)
     plt.show()
+
+    # res_len = dict(sorted(res_len.items(), key=lambda x: x[0]))
+    # alphab = list(res_len.values())
+    # frequencies = list(res_len.keys())
+    #
+    # pos1 = np.arange(len(frequencies))
+    # ax1 = plt.axes()
+    # ax1.set_xticks(pos1)
+    # ax1.set_xticklabels(frequencies)
+    # ax1.set_xlabel('Число слов в повторе')
+    # ax1.set_ylabel('Число классов')
+    # plt.bar(pos1, alphab, width=0.4, color='b')
+    # plt.title('Число классов с равным числом слов в повторе')
+    # plt.show()
 
 
 if __name__ == '__main__':

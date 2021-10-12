@@ -67,7 +67,7 @@ def train_node2vec_db(all_edges):
 
 
 def train_node2vec(whole_tree_plain, dict_lemmas_rev):
-    walk_length = 10
+    walk_length = 5
     # filtered_edges = list(filter(lambda edge: edge.node_from != 0, whole_tree_plain.edges))
     dict_lemmas_rev[0] = 'root'
     sources = list(map(lambda edge: dict_lemmas_rev[whole_tree_plain.get_node(edge.node_from).lemma], whole_tree_plain.edges))
@@ -84,8 +84,8 @@ def train_node2vec(whole_tree_plain, dict_lemmas_rev):
         nodes=stellar_graph.nodes(),  # root nodes
         length=walk_length,  # maximum length of a random walk
         n=5,  # number of random walks per root node
-        p=4,  # Defines (unormalised) probability, 1/p, of returning to source node
-        q=6,  # Defines (unormalised) probability, 1/q, for moving away from source node
+        p=2,  # Defines (unormalised) probability, 1/p, of returning to source node
+        q=3,  # Defines (unormalised) probability, 1/q, for moving away from source node
         weighted=True,  # for weighted random walks
         seed=42,  # random seed fixed for reproducibility
     )
@@ -111,17 +111,17 @@ def train_node2vec_joined(whole_tree_plain, db_edges, dict_lemmas_rev):
     targets_db = list(map(lambda edge: edge.node_to, db_edges))
     edges = pd.DataFrame({
         "source": sources + sources_db,
-        "target": targets + targets_db
-        # "weight": weights
+        "target": targets + targets_db,
+        # "weight": weights + [1] * len(sources_db)
     })
     stellar_graph = StellarDiGraph(edges=edges)
     random_walk = BiasedRandomWalk(stellar_graph)
     weighted_walks = random_walk.run(
         nodes=stellar_graph.nodes(),  # root nodes
         length=walk_length,  # maximum length of a random walk
-        n=5,  # number of random walks per root node
-        p=3,  # Defines (unormalised) probability, 1/p, of returning to source node
-        q=7,  # Defines (unormalised) probability, 1/q, for moving away from source node
+        n=3,  # number of random walks per root node
+        p=4,  # Defines (unormalised) probability, 1/p, of returning to source node
+        q=6,  # Defines (unormalised) probability, 1/q, for moving away from source node
         # weighted=True,  # for weighted random walks
         seed=42,  # random seed fixed for reproducibility
     )
@@ -132,7 +132,7 @@ def train_node2vec_joined(whole_tree_plain, db_edges, dict_lemmas_rev):
     weighted_model.build_vocab([list(additional_model.vocab.keys())[:UPPER_BOUND_ADDITIONAL_DATA]], update=True)
     weighted_model.intersect_word2vec_format(ADDITIONAL_CORPUS_PATH, binary=True, lockf=1.0, unicode_errors='ignore')
     weighted_model.train(weighted_walks, total_examples=weighted_model.corpus_count, epochs=weighted_model.iter)
-    weighted_model.save("trained_node2vec_joined_2.model")
+    weighted_model.save("trained_node2vec_joined.model")
 
 
 def load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, model_name): #dict_lemmas_filt,

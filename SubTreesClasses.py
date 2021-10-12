@@ -3,8 +3,9 @@ from collections import defaultdict
 from itertools import combinations, product
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 
-from Preprocessing import read_data, replace_time_constructions
+from Preprocessing import read_data, replace_time_constructions, pick_new_sentences
 from Tree import Tree, Node, Edge
 from Util import merge_in_file, filter_classes, write_classes_in_txt, filter_meaningless_classes, get_all_words, \
     label_classes, \
@@ -39,6 +40,8 @@ def construct_tree(trees_df_filtered, dict_lemmas, dict_rel, remapped_sent):
             weight = dict_rel.get(row['deprel'])
             sent = remapped_sent[row['sent_name']]
             pos_tag = row['upostag']
+            if pos_tag == PROPN_POS:
+                pos_tag = NOUN_POS
             pos_extended = row['feats']
             form = row['form']
             # create main node
@@ -762,29 +765,39 @@ def prepare_results(meaningful_classes, classes_sents_filtered):
 
 def annotate_data():
     # READ DATA
+    print('Reading...')
     start = time.time()
     trees_df_filtered = read_data_to_df()
     num_sentences = len(set(trees_df_filtered['sent_name'].to_list()))
     reading_time = (time.time() - start) / 60
 
     # LOAD VECTOR SPACE
+    print('Loading vector space...')
     start = time.time()
     part_of_speech_node_id = dict(trees_df_filtered[['lemma', 'upostag']].groupby(['lemma', 'upostag']).groups.keys())
+    part_of_speech_node_id = {k:v if v != 'PROPN' else 'NOUN' for k, v in part_of_speech_node_id.items()}
     dict_lemmas_full = {lemma: [index] for index, lemma in
                         enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
     dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
     remapped_sent = {sent_name: index for index, sent_name in enumerate(dict.fromkeys(trees_df_filtered['sent_name'].to_list()), 1)}
-    # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_node2vec.model")  # node2vec
-
     dict_lemmas_rev = {index[0]: lemma for lemma, index in dict_lemmas_full.items()}
-    whole_tree_plain = construct_tree(trees_df_filtered, dict_lemmas_full, dict_rel,
-                                      remapped_sent)  # graph is needed for node2vec
-    whole_tree_plain.set_help_dict()
-    train_node2vec(whole_tree_plain, dict_lemmas_rev)
+
+    # FOR TRAINING DB MODEL
+    # all_db_edges, edge_labels, all_db_labels = construct_db_tree(get_all_wikidata_entities())
+    # train_node2vec_joined(whole_tree_plain, all_db_edges, dict_lemmas_rev)
+
+    # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_node2vec_joined.model")  # node2vec # not needed
+
+    # FOR TRAINING PLAIN EMBEDDINGS
+    # whole_tree_plain = construct_tree(trees_df_filtered, dict_lemmas_full, dict_rel,
+    #                                   remapped_sent)  # graph is needed for node2vec
+    # whole_tree_plain.set_help_dict()
+    # train_node2vec(whole_tree_plain, dict_lemmas_rev)
     load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_final.model")  # node2vec
     w2v_time = (time.time() - start) / 60
 
     # CONSTRUCTING A TREE
+    print('Constructing a tree...')
     start = time.time()
     whole_tree = construct_tree(trees_df_filtered, dict_lemmas_full, dict_rel, remapped_sent)
     whole_tree.set_help_dict()
@@ -792,11 +805,13 @@ def annotate_data():
     construct_tree_time = (time.time() - start) / 60
 
     # COMPUTE REPEATS
+    print('Computing repeats...')
     start = time.time()
     classes_part, classes_part_list = calculate_repeats_helper(whole_tree)
     algo_time = (time.time() - start) / 60
 
     # POSTPROCESSING AND ANNOTATION
+    print('Postprocessing and annotating...')
     start = time.time()
     meaningful_classes_filtered_squashed_sort, class_id_labels, new_classes_mapping, new_class_id_label = postprocess_and_label(classes_part, classes_part_list, whole_tree, dict_lemmas_full, trees_df_filtered, remapped_sent)
     postprocess_label_time = (time.time() - start) / 60
@@ -810,17 +825,16 @@ def annotate_data():
     overall_time = [reading_time, w2v_time, construct_tree_time, algo_time, postprocess_label_time]
     class_id_labels_full_edited = {k: set([v_i.lower() for v_i in list(v)]) for k, v in class_id_labels_full.items()}
     # NOT NEEDED FOR RUNTIME
-    # dict_rel_rev = {v: k for k, v in dict_rel.items()}
-    # write_classes_in_txt(whole_tree, meaningful_classes_filtered_squashed_sort, classes_sents_filtered,
-    #                      new_classes_mapping, dict_rel_rev, RESULT_PATH, class_id_labels_full_edited)
-    # merge_in_file(RESULT_PATH, MERGED_PATH)
+    dict_rel_rev = {v: k for k, v in dict_rel.items()}
+    write_classes_in_txt(whole_tree, meaningful_classes_filtered_squashed_sort, classes_sents_filtered,
+                         new_classes_mapping, dict_rel_rev, RESULT_PATH, class_id_labels_full_edited)
+    merge_in_file(RESULT_PATH, MERGED_PATH)
     return overall_time, label_classes_sorted, results_dict, num_sentences, num_classes_labeled, result_sent_dict, class_id_labels_full_edited
 
 
 def plot_repeat_len(results_dict):
-    MEDIUM_SIZE = 14
-    BIGGER_SIZE = 16
-
+    MEDIUM_SIZE = 12
+    BIGGER_SIZE = 14
     # plt.rc('font', size=MEDIUM_SIZE)  # controls default text sizes
     plt.rc('axes', titlesize=BIGGER_SIZE)  # fontsize of the axes title
     plt.rc('axes', labelsize=BIGGER_SIZE)  # fontsize of the x and y labels
@@ -840,14 +854,39 @@ def plot_repeat_len(results_dict):
     ax1 = plt.axes()
     ax1.set_xticks(pos1)
     ax1.set_xticklabels(frequencies)
-    ax1.set_xlabel('Число слов в повторе')
-    ax1.set_ylabel('Число классов')
-    plt.bar(pos1, alphab, width=0.4, color='b')
-    plt.title('Число классов с равным числом слов в повторе')
+    ax1.set_xlabel('Number of words in a repeat', fontsize=12)
+    ax1.set_ylabel('Number of groups', fontsize=12)
+    plt.bar(pos1, alphab, width=0.9, color='b')
+    plt.title('Number of groups with equal number of words in a repeat', fontsize=12)
     plt.show()
 
+    import seaborn as sns
+    import pandas as pd
+
+    joint_dict = dict(sorted({labels_en[i]: counts[i] for i in range(30)}.items(), key=lambda x: x[1], reverse=True))
+    joint_df = pd.DataFrame({'label': list(joint_dict.keys()), 'count': list(joint_dict.values())})
+    ax = sns.barplot(x='count', y='label',
+                     data=joint_df,
+                     palette="crest")
+    ax.set(xlabel='count', ylabel='label')
+    plt.figure(figsize=(10, 8))
+    sns.set_theme(style="whitegrid")
+    # sns.set_color_codes("Blues_d")
+    # sns.barplot(x=list(joint_dict.values()), y=list(joint_dict.keys()), palette="crest")
+    sns.despine(left=True, bottom=True)
+    plt.tight_layout()
+    plt.show()
+    # labels_en = ['impaired glucose metabolism', 'mental state', 'medical profession', 'frustration of feelings',
+    #              'psychopathological symptom', 'substance', 'livelihood', 'anatomical structure class type',
+    #              'medical report', 'document', 'organ type', 'cause of death', 'medical specialty',
+    #              'type of laboratory diagnosis', 'institute', 'anatomical structure', 'medical procedure',
+    #              'negative emotion', 'state', 'drug', 'health problem', 'disease characteristic', 'chemical compound',
+    #              'natural satellite', 'symptom', 'medicine', 'biomedical measurand type', 'disease', 'event',
+    #              'time stamp']
 
 def main():
+    # pick_new_sentences()
+    # label_data_with_wiki([], {}, [], [])
     # draw_histogram()
     # normal_label_getter = lambda tup: tup[2]
     # form_label_getter = lambda tup: tup[1]
@@ -868,165 +907,165 @@ def main():
     # dict2 = sort_already_logged('medicalTextTrees/merged_wtf2.txt')
     # write_sorted_res_in_file(dict1, 'medicalTextTrees/merged_long_sorted.txt')
     # write_sorted_res_in_file(dict2, 'medicalTextTrees/merged_wtf2_sorted.txt')
-    start = time.time()
-    # trees_df_filtered, test_df = read_data() # TEST
-    trees_df_filtered = read_data()
-    # trees_df_filtered = trees_df_filtered[:1998]
-    replace_time_constructions(trees_df_filtered)
-    # replace_time_constructions(trees_full_df)
-    # replace_time_constructions(long_df)
-    print('Time on reading the data: ' + str(time.time() - start))
-    part_of_speech_node_id = dict(trees_df_filtered[['lemma', 'upostag']].groupby(['lemma', 'upostag']).groups.keys())
-    #
-    # # get all lemmas and create a dictionary to map to numbers
-    # dict_lemmas = {lemma: [index] for index, lemma in enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
-    dict_lemmas_full = {lemma: [index] for index, lemma in
-                        enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
-    dict_lemmas_full_2 = {lemma: [index] for index, lemma in
-                        enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
-    # dict_lemmas_test = {lemma: [index] for index, lemma in
-    #                     enumerate(dict.fromkeys(test_df['lemma'].to_list()), 1)}
-    dict_lemmas_rev = {index[0]: lemma for lemma, index in dict_lemmas_full.items()}
-    dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
-    dict_rel_rev = {v: k for k, v in dict_rel.items()}
-    remapped_sent = {sent_name: index for index, sent_name in enumerate(dict.fromkeys(trees_df_filtered['sent_name'].to_list()), 1)}
-    remapped_sent_rev = {index: sent_name for sent_name, index in remapped_sent.items()}
-
-    # dict_lemmas = {lemma: [index] for index, lemma in enumerate(dict.fromkeys(long_df['lemma'].to_list()), 1)}
-    dict_form_lemma_str = dict(zip(trees_df_filtered['form'].to_list(), trees_df_filtered['lemma'].to_list()))
-    dict_form_lemma_int = {k: dict_lemmas_full[v][0] for k, v in dict_form_lemma_str.items()}
+    # start = time.time()
+    # # trees_df_filtered, test_df = read_data() # TEST
+    # trees_df_filtered = read_data()
+    # # trees_df_filtered = trees_df_filtered[:1998]
+    # replace_time_constructions(trees_df_filtered)
+    # # replace_time_constructions(trees_full_df)
+    # # replace_time_constructions(long_df)
+    # print('Time on reading the data: ' + str(time.time() - start))
+    # part_of_speech_node_id = dict(trees_df_filtered[['lemma', 'upostag']].groupby(['lemma', 'upostag']).groups.keys())
+    # #
+    # # # get all lemmas and create a dictionary to map to numbers
+    # # dict_lemmas = {lemma: [index] for index, lemma in enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
     # dict_lemmas_full = {lemma: [index] for index, lemma in
-    #                     enumerate(dict.fromkeys(trees_full_df['lemma'].to_list()), 1)}
-    # dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(long_df['deprel'].to_list()))}
+    #                     enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
+    # dict_lemmas_full_2 = {lemma: [index] for index, lemma in
+    #                     enumerate(dict.fromkeys(trees_df_filtered['lemma'].to_list()), 1)}
+    # # dict_lemmas_test = {lemma: [index] for index, lemma in
+    # #                     enumerate(dict.fromkeys(test_df['lemma'].to_list()), 1)}
+    # dict_lemmas_rev = {index[0]: lemma for lemma, index in dict_lemmas_full.items()}
+    # dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(trees_df_filtered['deprel'].to_list()))}
     # dict_rel_rev = {v: k for k, v in dict_rel.items()}
-    # visualize_embeddings(dict_lemmas_full, "trained_node2vec.model", "trained.model")
-    if RUN_WITH_W2V:
-        start = time.time()
-        if LOAD_TRAINED:
-            # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id)
-            load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_node2vec.model")  # node2vec
-            # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_node2vec")  # node2vec
-            # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained.model") # word2vec
-        else:
-            # train_word2vec(trees_df_filtered)
-            whole_tree_plain = construct_tree(trees_df_filtered, dict_lemmas_full, dict_rel, remapped_sent) # graph is needed for node2vec
-            whole_tree_plain.set_help_dict()
-            all_db_edges, edge_labels, all_db_labels = construct_db_tree(get_all_wikidata_entities())
-            train_node2vec_joined(whole_tree_plain, all_db_edges, dict_lemmas_rev)
-
-            # db_tree_edges = construct_db_tree(get_all_wikidata_entities())
-            train_node2vec(whole_tree_plain, dict_lemmas_rev)
-            # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id) #dict_lemmas,
-            # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_node2vec.model")
-            similar_lemmas_dict_filtered_sg = load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_final_skipgram.model")
-            similar_lemmas_dict_filtered_bow = load_trained_word2vec(dict_lemmas_full_2, part_of_speech_node_id, "trained_node2vec.model")  # node2vec
-        print('Time on word2vec: ' + str(time.time() - start))
-
-    start = time.time()
-    # long_df = long_df[:1223]
-    # whole_tree = construct_tree(trees_df_filtered, dict_lemmas, dict_rel)
-    # whole_tree = construct_tree(test_df, dict_lemmas_test, dict_rel, remapped_sent) # TEST
-    whole_tree = construct_tree(trees_df_filtered, dict_lemmas_full, dict_rel, remapped_sent)
-    # whole_tree = new_test()
-    # whole_tree = construct_tree(long_df, dict_lemmas, dict_rel)
-    # write_tree_in_table(whole_tree)
-    print('Time on constructing the tree: ' + str(time.time() - start))
-
-    whole_tree.set_help_dict()
-    # partition nodes by height
-    start = time.time()
-    whole_tree.calculate_heights()
-    print('Time on calculating all heights: ' + str(time.time() - start))
-
-    heights_dictionary = {whole_tree.get_node(node_id): heights for node_id, heights in
-                          whole_tree.heights.items()}
-    grouped_heights = defaultdict(list)
-    for node_1, heights in heights_dictionary.items():
-        for height in heights:
-            grouped_heights[height].append(node_1)
-    grouped_heights = sorted(grouped_heights.items(), key=lambda x: x[0])
-    dict_lemmas_size = max(set(map(lambda x: x.lemma, whole_tree.nodes))) + 1
-    for node in whole_tree.nodes:
-        if node.id not in whole_tree.heights.keys():
-            whole_tree.heights[node.id] = whole_tree.heights[whole_tree.global_similar_mapping[node.id]]
-    set_node_depth(whole_tree, grouped_heights)
-    start = time.time()
-    classes_part, classes_part_list = compute_part_subtrees(whole_tree, dict_lemmas_size, grouped_heights)
-    # write_tree_in_table(whole_tree)
-    print('Time on calculating partial repeats: ' + str(time.time() - start))
-    # old
-    # start = time.time()   # write_in_file_old(classes_part, classes_part_list, whole_tree, remapped_sent_rev, dict_rel_rev)
-    # merge_in_file(RESULT_PATH_OLD, MERGED_PATH_OLD)
-    # print('Time on writing data old: ' + str(time.time() - start))
-    # new
-    start = time.time()
-    classes_wordgroups_filtered, classes_sents_filtered = filter_classes(classes_part, classes_part_list, whole_tree, remapped_sent_rev, dict_form_lemma_str)
-    meaningful_classes, meaningless_classes = filter_meaningless_classes(classes_wordgroups_filtered, dict_form_lemma_str)
-    classes_words, classes_count_passive_verbs = get_all_words(meaningful_classes, dict_form_lemma_str)
-    class_labels = label_classes(classes_words, classes_count_passive_verbs)
-    meaningful_classes_filtered = dict(sorted(meaningful_classes.items(), key=lambda x: len(x[1]), reverse=True))
-
-    dict_lemmas_full_edit = {v[0]: set(v) for k, v in dict_lemmas_full.items()}
-    for lemma, sim_lemmas in dict_lemmas_full_edit.items():
-        new_temp = dict_lemmas_full_edit[lemma].copy()
-        for sim_lemma in sim_lemmas:
-            new_temp.update(dict_lemmas_full_edit[sim_lemma])
-        dict_lemmas_full_edit[lemma] = new_temp.copy()
-            # if lemma not in dict_lemmas_full_extended.keys():
-            #     dict_lemmas_full_extended[lemma] = dict_lemmas_full_edit[sim_lemma].copy()
-            # else:
-            #     dict_lemmas_full_extended[lemma].update(dict_lemmas_full_edit[sim_lemma])
-    dict_lemmas_full_extended_2 = {k: tuple(sorted(list(v))) for k, v in dict_lemmas_full_edit.items()}
-    res = defaultdict(list)
-    for key, val in sorted(dict_lemmas_full_extended_2.items()):
-        res[val].append(key)
-    new_labels = {v: k for k, v in enumerate(res.keys())}
-    dict_lemmas_full_new_labels = {k: new_labels[v] for k, v in dict_lemmas_full_extended_2.items()}
-    # dict_lemmas_similar = {sim_lemma_id: sim_lemma_ids[0] for _, sim_lemma_ids in dict_lemmas_full.items() for sim_lemma_id in sim_lemma_ids}
-    meaningful_classes_filtered_squashed, new_classes_mapping = squash_classes(whole_tree, meaningful_classes_filtered, dict_lemmas_full_new_labels, dict_form_lemma_int)
-    # # group classes by assigned labels
-    # grouped_classes_by_label = defaultdict(list)
-    # for key, values in sorted(class_labels.items()):
-    #     for value in values:
-    #         grouped_classes_by_label[value].append(key)
-    meaningful_classes_filtered_squashed_sort = dict(sorted(meaningful_classes_filtered_squashed.items(), key=lambda x: len(x[1]), reverse=True))
-    class_id_labels = label_data_with_wiki(meaningful_classes_filtered_squashed_sort, dict_form_lemma_str, class_labels, new_classes_mapping)
-
-    # grouped_heights_2 = {}
-    # for v_id, v_id_heights in whole_tree.heights.items():
-    #     for v_id_height in v_id_heights:
-    #         if v_id_height not in grouped_heights_2.keys():
-    #             grouped_heights_2[v_id_height] = [v_id]
-    #         else:
-    #             grouped_heights_2[v_id_height].append(v_id)
-    # deep_children = {}
-    # for node in whole_tree.nodes:
-    #     if node.num_deep_children not in deep_children.keys():
-    #         deep_children[node.num_deep_children] = [tuple([node.id, node.form])]
+    # remapped_sent = {sent_name: index for index, sent_name in enumerate(dict.fromkeys(trees_df_filtered['sent_name'].to_list()), 1)}
+    # remapped_sent_rev = {index: sent_name for sent_name, index in remapped_sent.items()}
+    #
+    # # dict_lemmas = {lemma: [index] for index, lemma in enumerate(dict.fromkeys(long_df['lemma'].to_list()), 1)}
+    # dict_form_lemma_str = dict(zip(trees_df_filtered['form'].to_list(), trees_df_filtered['lemma'].to_list()))
+    # dict_form_lemma_int = {k: dict_lemmas_full[v][0] for k, v in dict_form_lemma_str.items()}
+    # # dict_lemmas_full = {lemma: [index] for index, lemma in
+    # #                     enumerate(dict.fromkeys(trees_full_df['lemma'].to_list()), 1)}
+    # # dict_rel = {rel: index for index, rel in enumerate(dict.fromkeys(long_df['deprel'].to_list()))}
+    # # dict_rel_rev = {v: k for k, v in dict_rel.items()}
+    # # visualize_embeddings(dict_lemmas_full, "trained_node2vec.model", "trained.model")
+    # if RUN_WITH_W2V:
+    #     start = time.time()
+    #     if LOAD_TRAINED:
+    #         # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id)
+    #         load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_node2vec.model")  # node2vec
+    #         # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_node2vec")  # node2vec
+    #         # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained.model") # word2vec
     #     else:
-    #         deep_children[node.num_deep_children].append(tuple([node.id, node.form]))
-    classes_sents_filtered = {k:list(map(lambda x: remapped_sent_rev[x[0].sent_name], v)) for k, v in meaningful_classes_filtered_squashed_sort.items()}
-    if WRITE_IN_FILES:
-        # meaningful
-        write_classes_in_txt(whole_tree, meaningful_classes_filtered_squashed_sort, classes_sents_filtered, new_classes_mapping, dict_rel_rev, class_labels, RESULT_PATH, class_id_labels)
-        merge_in_file(RESULT_PATH, MERGED_PATH)
-        # meaningless
-        # write_classes_in_txt(whole_tree, meaningless_classes, classes_sents_filtered, new_classes_mapping, dict_rel_rev, {}, RESULT_PATH_FILTERED)
-        # merge_in_file(RESULT_PATH_FILTERED, MERGED_PATH_FILTERED)
-    print('Time on writing data new: ' + str(time.time() - start))
-    gg = []
-
-    # TEST
-    # test_tree = Util.get_test_tree()
-    # dict_lemmas_test_size = max(set(map(lambda x: x.lemma, test_tree.nodes)))
-    # Tree.calculate_heights(test_tree)
-    # heights_dictionary_tst = {Tree.get_node(test_tree, node_id): height for node_id, height in
-    #                       enumerate(test_tree.heights)}
-    # grouped_heights_tst = defaultdict(list)
-    # for key, value in heights_dictionary_tst.items():
-    #     grouped_heights_tst[value].append(key)
-    # grouped_heights_test = sorted(grouped_heights_tst.items(), key=lambda x: x[0])
-    # compute_part_subtrees(test_tree, dict_lemmas_test_size, grouped_heights_test)
+    #         # train_word2vec(trees_df_filtered)
+    #         whole_tree_plain = construct_tree(trees_df_filtered, dict_lemmas_full, dict_rel, remapped_sent) # graph is needed for node2vec
+    #         whole_tree_plain.set_help_dict()
+    #         all_db_edges, edge_labels, all_db_labels = construct_db_tree(get_all_wikidata_entities())
+    #         train_node2vec_joined(whole_tree_plain, all_db_edges, dict_lemmas_rev)
+    #
+    #         # db_tree_edges = construct_db_tree(get_all_wikidata_entities())
+    #         train_node2vec(whole_tree_plain, dict_lemmas_rev)
+    #         # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id) #dict_lemmas,
+    #         # load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_node2vec.model")
+    #         similar_lemmas_dict_filtered_sg = load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_final_skipgram.model")
+    #         similar_lemmas_dict_filtered_bow = load_trained_word2vec(dict_lemmas_full_2, part_of_speech_node_id, "trained_node2vec.model")  # node2vec
+    #     print('Time on word2vec: ' + str(time.time() - start))
+    #
+    # start = time.time()
+    # # long_df = long_df[:1223]
+    # # whole_tree = construct_tree(trees_df_filtered, dict_lemmas, dict_rel)
+    # # whole_tree = construct_tree(test_df, dict_lemmas_test, dict_rel, remapped_sent) # TEST
+    # whole_tree = construct_tree(trees_df_filtered, dict_lemmas_full, dict_rel, remapped_sent)
+    # # whole_tree = new_test()
+    # # whole_tree = construct_tree(long_df, dict_lemmas, dict_rel)
+    # # write_tree_in_table(whole_tree)
+    # print('Time on constructing the tree: ' + str(time.time() - start))
+    #
+    # whole_tree.set_help_dict()
+    # # partition nodes by height
+    # start = time.time()
+    # whole_tree.calculate_heights()
+    # print('Time on calculating all heights: ' + str(time.time() - start))
+    #
+    # heights_dictionary = {whole_tree.get_node(node_id): heights for node_id, heights in
+    #                       whole_tree.heights.items()}
+    # grouped_heights = defaultdict(list)
+    # for node_1, heights in heights_dictionary.items():
+    #     for height in heights:
+    #         grouped_heights[height].append(node_1)
+    # grouped_heights = sorted(grouped_heights.items(), key=lambda x: x[0])
+    # dict_lemmas_size = max(set(map(lambda x: x.lemma, whole_tree.nodes))) + 1
+    # for node in whole_tree.nodes:
+    #     if node.id not in whole_tree.heights.keys():
+    #         whole_tree.heights[node.id] = whole_tree.heights[whole_tree.global_similar_mapping[node.id]]
+    # set_node_depth(whole_tree, grouped_heights)
+    # start = time.time()
+    # classes_part, classes_part_list = compute_part_subtrees(whole_tree, dict_lemmas_size, grouped_heights)
+    # # write_tree_in_table(whole_tree)
+    # print('Time on calculating partial repeats: ' + str(time.time() - start))
+    # # old
+    # # start = time.time()   # write_in_file_old(classes_part, classes_part_list, whole_tree, remapped_sent_rev, dict_rel_rev)
+    # # merge_in_file(RESULT_PATH_OLD, MERGED_PATH_OLD)
+    # # print('Time on writing data old: ' + str(time.time() - start))
+    # # new
+    # start = time.time()
+    # classes_wordgroups_filtered, classes_sents_filtered = filter_classes(classes_part, classes_part_list, whole_tree, remapped_sent_rev, dict_form_lemma_str)
+    # meaningful_classes, meaningless_classes = filter_meaningless_classes(classes_wordgroups_filtered, dict_form_lemma_str)
+    # classes_words, classes_count_passive_verbs = get_all_words(meaningful_classes, dict_form_lemma_str)
+    # class_labels = label_classes(classes_words, classes_count_passive_verbs)
+    # meaningful_classes_filtered = dict(sorted(meaningful_classes.items(), key=lambda x: len(x[1]), reverse=True))
+    #
+    # dict_lemmas_full_edit = {v[0]: set(v) for k, v in dict_lemmas_full.items()}
+    # for lemma, sim_lemmas in dict_lemmas_full_edit.items():
+    #     new_temp = dict_lemmas_full_edit[lemma].copy()
+    #     for sim_lemma in sim_lemmas:
+    #         new_temp.update(dict_lemmas_full_edit[sim_lemma])
+    #     dict_lemmas_full_edit[lemma] = new_temp.copy()
+    #         # if lemma not in dict_lemmas_full_extended.keys():
+    #         #     dict_lemmas_full_extended[lemma] = dict_lemmas_full_edit[sim_lemma].copy()
+    #         # else:
+    #         #     dict_lemmas_full_extended[lemma].update(dict_lemmas_full_edit[sim_lemma])
+    # dict_lemmas_full_extended_2 = {k: tuple(sorted(list(v))) for k, v in dict_lemmas_full_edit.items()}
+    # res = defaultdict(list)
+    # for key, val in sorted(dict_lemmas_full_extended_2.items()):
+    #     res[val].append(key)
+    # new_labels = {v: k for k, v in enumerate(res.keys())}
+    # dict_lemmas_full_new_labels = {k: new_labels[v] for k, v in dict_lemmas_full_extended_2.items()}
+    # # dict_lemmas_similar = {sim_lemma_id: sim_lemma_ids[0] for _, sim_lemma_ids in dict_lemmas_full.items() for sim_lemma_id in sim_lemma_ids}
+    # meaningful_classes_filtered_squashed, new_classes_mapping = squash_classes(whole_tree, meaningful_classes_filtered, dict_lemmas_full_new_labels, dict_form_lemma_int)
+    # # # group classes by assigned labels
+    # # grouped_classes_by_label = defaultdict(list)
+    # # for key, values in sorted(class_labels.items()):
+    # #     for value in values:
+    # #         grouped_classes_by_label[value].append(key)
+    # meaningful_classes_filtered_squashed_sort = dict(sorted(meaningful_classes_filtered_squashed.items(), key=lambda x: len(x[1]), reverse=True))
+    # class_id_labels = label_data_with_wiki(meaningful_classes_filtered_squashed_sort, dict_form_lemma_str, class_labels, new_classes_mapping)
+    #
+    # # grouped_heights_2 = {}
+    # # for v_id, v_id_heights in whole_tree.heights.items():
+    # #     for v_id_height in v_id_heights:
+    # #         if v_id_height not in grouped_heights_2.keys():
+    # #             grouped_heights_2[v_id_height] = [v_id]
+    # #         else:
+    # #             grouped_heights_2[v_id_height].append(v_id)
+    # # deep_children = {}
+    # # for node in whole_tree.nodes:
+    # #     if node.num_deep_children not in deep_children.keys():
+    # #         deep_children[node.num_deep_children] = [tuple([node.id, node.form])]
+    # #     else:
+    # #         deep_children[node.num_deep_children].append(tuple([node.id, node.form]))
+    # classes_sents_filtered = {k:list(map(lambda x: remapped_sent_rev[x[0].sent_name], v)) for k, v in meaningful_classes_filtered_squashed_sort.items()}
+    # if WRITE_IN_FILES:
+    #     # meaningful
+    #     write_classes_in_txt(whole_tree, meaningful_classes_filtered_squashed_sort, classes_sents_filtered, new_classes_mapping, dict_rel_rev, class_labels, RESULT_PATH, class_id_labels)
+    #     merge_in_file(RESULT_PATH, MERGED_PATH)
+    #     # meaningless
+    #     # write_classes_in_txt(whole_tree, meaningless_classes, classes_sents_filtered, new_classes_mapping, dict_rel_rev, {}, RESULT_PATH_FILTERED)
+    #     # merge_in_file(RESULT_PATH_FILTERED, MERGED_PATH_FILTERED)
+    # print('Time on writing data new: ' + str(time.time() - start))
+    # gg = []
+    #
+    # # TEST
+    # # test_tree = Util.get_test_tree()
+    # # dict_lemmas_test_size = max(set(map(lambda x: x.lemma, test_tree.nodes)))
+    # # Tree.calculate_heights(test_tree)
+    # # heights_dictionary_tst = {Tree.get_node(test_tree, node_id): height for node_id, height in
+    # #                       enumerate(test_tree.heights)}
+    # # grouped_heights_tst = defaultdict(list)
+    # # for key, value in heights_dictionary_tst.items():
+    # #     grouped_heights_tst[value].append(key)
+    # # grouped_heights_test = sorted(grouped_heights_tst.items(), key=lambda x: x[0])
+    # # compute_part_subtrees(test_tree, dict_lemmas_test_size, grouped_heights_test)
 
 
 if __name__ == '__main__':

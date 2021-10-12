@@ -31,8 +31,9 @@ def read_vidal():
 
 
 def read_data():
-    files = os.listdir(DATA_PATH)
-    df_columns = ['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel']
+    # files = os.listdir(DATA_PATH)
+    files = os.listdir(PARSED_RAW_PAVLOV_UNIQUE)
+    df_columns = ['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel', 'toDelete1', 'toDelete2']
     # len_30 = ['100701_2', '112228_5', '233471_2', '339012_3', '366067_1', '109912_0', '255861_0', '281689_1', '148632_19', '192213_6', '246011_9', '254050_32', '359728_3', '361037_9', '368882_3_1', '361086_8', '152888_21_1', '129821_30', '270150_19', '246011_11', '221783_0_1', '227529_2', '266948_0_1', '359728_6', '361175_2', '51183_6']
     # len_30 = ['100701_2', '112228_5', '233471_2', '339012_3', '366067_1', '109912_0', '255861_0', '281689_1', '148632_19', '192213_6', '246011_9', '254050_32', '359728_3']
     stable_df = []
@@ -40,11 +41,13 @@ def read_data():
     unique_sents = {}
     for file in files:
         if file != 'Store':
-            full_dir = os.path.join(DATA_PATH, file)
+            # full_dir = os.path.join(DATA_PATH, file)
+            full_dir = os.path.join(PARSED_RAW_PAVLOV_UNIQUE, file)
             name = file.split('.')[0]
             with open(full_dir, 'rb') as f:
                 this_df = pd.read_csv(f, sep='\t', names=df_columns)
-                this_df_filtered = this_df[this_df.deprel != 'PUNC']
+                # this_df_filtered = this_df[this_df.deprel != 'PUNC']
+                this_df_filtered = this_df[this_df.deprel != PUNCT_RELATION.lower()]
                 if this_df['id'].duplicated().any():
                     start_of_subtree_df = list(this_df.groupby(this_df.id).get_group(1).index)
                     boundaries = start_of_subtree_df + [max(list(this_df.index)) + 1]
@@ -58,7 +61,7 @@ def read_data():
                 else:
                     this_df['sent_name'] = name
                     # stable_df.append(this_df)           # for strong equality
-                    if this_df_filtered.shape[0] < 30:         # for word2vec
+                    if this_df_filtered.shape[0] < WORDS_IN_SENT:         # for word2vec
                         stable_df.append(this_df)
                     # else:
                     #     long_df.append(this_df)
@@ -71,20 +74,26 @@ def read_data():
         else:
             dfs_grouped_by[sent_len].append(df)
     dfs_filtered = []
+    sent_count = 0
     for _, dfs in dfs_grouped_by.items():
         if len(dfs) > 1:
             sent_history = []
             for df in dfs:
-                if list(df.form)[0] == list(df.form)[0]:
-                    sent_words = SPACE.join(list(df.form))
+                if list(df.form)[0] == list(df.form)[0] and len(df) > 1:
+                    try:
+                        sent_words = SPACE.join(list(df.form))
+                    except TypeError as te:
+                        ggg = []
                     # dfs_filtered.append(df)
-                    if sent_words not in sent_history:
+                    if sent_words not in sent_history and not sent_count > SENT_NUM:
+                        sent_count += 1
                         sent_history.append(sent_words)
                         dfs_filtered.append(df)
     # trees_df = pd.concat(stable_df, axis=0, ignore_index=True)
     len_sent = {}
     for df in dfs_filtered:
-        this_df = df[df.deprel != 'PUNC']
+        # this_df = df[df.deprel != 'PUNC']
+        this_df = df[df.deprel != PUNCT_RELATION]
         sent_n = list(this_df.sent_name)[0]
         words = list(this_df.form)
         if len(words) not in len_sent.keys():
@@ -101,9 +110,9 @@ def read_data():
     trees_df = pd.concat(dfs_filtered, axis=0, ignore_index=True)
     # long_df = pd.concat(long_df, axis=0, ignore_index=True)
     # delete useless data
-    trees_df = trees_df.drop(columns=['xpostag'], axis=1)
+    trees_df = trees_df.drop(columns=['xpostag', 'toDelete1', 'toDelete2'], axis=1)
     # trees_df.drop(index=[11067], inplace=True)
-    trees_df.loc[13742, 'deprel'] = 'разъяснит'
+    # trees_df.loc[13742, 'deprel'] = 'разъяснит' !!!
 
     # delete relations of type PUNC and reindex
 
@@ -112,7 +121,10 @@ def read_data():
     # long_df_filtered = long_df_filtered.reset_index(drop=True)
     # long_df_filtered.index = long_df_filtered.index + 1
 
-    trees_df_filtered = trees_df[trees_df.deprel != 'PUNC']
+    # trees_df_filtered = trees_df[trees_df.deprel != 'PUNC']
+    strange_sentences = ['143096_4', '306218_1', '250555_5', '129889_5', '331269_13']
+    trees_df = trees_df.loc[~trees_df.sent_name.isin(strange_sentences)]
+    trees_df_filtered = trees_df[trees_df.deprel != PUNCT_RELATION]
     trees_df_filtered = trees_df_filtered.reset_index(drop=True)
     trees_df_filtered.index = trees_df_filtered.index + 1
     # trees_df_filtered.loc[12239, 'deprel'] = '1-компл'
@@ -131,7 +143,8 @@ def read_data():
 
     replaced_numbers = [k for k, v in trees_df_filtered.lemma.str.contains('#').to_dict().items() if v == True]
     for num in replaced_numbers:
-        trees_df_filtered.loc[num, 'upostag'] = 'M'
+        # trees_df_filtered.loc[num, 'upostag'] = 'M'
+        trees_df_filtered.loc[num, 'upostag'] = NUM_POS
 
     # target_sents = list({'43829_4', '46581_0', '300424_0'})
     # target_sents = list({'44112_8', '55654_2', '32867_6', '57809_7'})  # TEST
@@ -142,14 +155,14 @@ def read_data():
     # target_sents = list({'46855_3', '48408_0', '37676_3', '56109_5', '56661_0', '54743_1'}) # TEST !!!!trickyyyy
     # target_sents = list({'37535_4', '31635_2', '39786_8'}) # TEST !!!!trickyyyy
     # target_sents = list({'48408_0', '37676_3', '32191_0', '56109_5', '56661_0', '54743_1'}) # TEST
-    target_sents = list({'46855_3', '37676_3'})  # TEST !!!!!!!!
+    # target_sents = list({'46855_3', '37676_3'})  # TEST !!!!!!!!
     # target_sents = list({'46855_3', '37676_3', '54743_1'})  # TEST
     # target_sents = list({'58282_3', '46855_3', '37676_3'}) # TEST
     # target_sents = list({'32191_2', '58282_3', '55066_0', '46855_3', '48408_0'})
     # target_sents = list({'53718_0', '46007_0', '56109_2', '41184_0'}) # test for plain
     # target_sents = list({'167529_9', '152369_9', '172030_9', '172030_23', '48408_0'}) # meeeeeess
 
-    test_df = trees_df_filtered.loc[trees_df_filtered.sent_name.isin(target_sents)] # TEST
+    # test_df = trees_df_filtered.loc[trees_df_filtered.sent_name.isin(target_sents)] # TEST
     # trees_full_df.loc[trees_full_df.index.isin(replaced_numbers)].assign(upostag = 'N')
 
     # trees_df_filtered = trees_df_filtered.head(513)
@@ -157,6 +170,7 @@ def read_data():
     # trees_df_filtered = trees_df_filtered.head(411)
     # trees_df_filtered = trees_df_filtered.head(431)
     # trees_df_filtered = trees_df_filtered.head(4824)
+    # trees_df_filtered = trees_df_filtered[:7357]
     return trees_df_filtered#, test_df
 
 
@@ -174,7 +188,7 @@ def sort_the_data():
         full_dir = os.path.join(DATA_PATH, file)
         with open(full_dir, encoding='utf-8') as f:
             this_df = pd.read_csv(f, sep='\t', names=df_columns)
-            this_df = this_df[this_df.deprel != 'PUNC']
+            this_df = this_df[this_df.deprel != PUNCT_RELATION]
         if this_df.groupby(this_df.deprel).get_group('ROOT').shape[0] > 1:
             shutil.copy(full_dir, MANY_ROOTS_DATA_PATH)
         elif this_df.shape[0] > 23:
@@ -209,23 +223,15 @@ def func(lemma):
 
 # compare new sentences with existent, pick ones that don't duplicate
 def pick_new_sentences():
-    existing_sent = []
-    existing_len = []
-    files = os.listdir(DATA_PATH)
-    df_columns = ['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel']
+    files = os.listdir(RAW_DATA_PATH)
+    sent_set = set()
+    unique_sent_names = []
     for file in files:
-        full_dir = os.path.join(DATA_PATH, file)
+        full_dir = os.path.join(RAW_DATA_PATH, file)
         with open(full_dir, encoding='utf-8') as f:
-            this_df = pd.read_csv(f, sep='\t', names=df_columns)
-            sent_str = EMPTY_STR.join(list(this_df.form))
-            existing_sent.append(sent_str)
-            existing_len.append(len(sent_str))
-    files_new = os.listdir(r"parus_results_tags_additional")
-    for file in files_new:
-        full_dir = os.path.join(r"parus_results_tags_additional", file)
-        with open(full_dir, encoding='utf-8') as f:
-            this_df = pd.read_csv(f, sep='\t', names=df_columns)
-            sent_str = EMPTY_STR.join(list(this_df.form))
-            if len(sent_str) not in existing_len:
-                if sent_str not in existing_sent:
-                    shutil.copy(full_dir, "brand_new_sentences")
+            sent = f.readlines()[0].split('\n')[0]
+            if sent not in sent_set:
+                sent_set.add(sent)
+                unique_sent_names.append(file)
+    for file in unique_sent_names:
+        shutil.copy(os.path.join(PARSED_RAW_PAVLOV, file), PARSED_RAW_PAVLOV_UNIQUE)
