@@ -31,7 +31,7 @@ ALGO_RESULT_N2V_FILT = "medicalTextTrees/algo_results_filtered/merged_extended_n
 # Word2vec training constants
 UPPER_BOUND_ADDITIONAL_DATA = 50000
 HIGH_COSINE_DIST = 0.75
-LOAD_TRAINED = True
+LOAD_TRAINED = False
 RUN_WITH_W2V = True
 WRITE_IN_FILES = True
 
@@ -45,14 +45,16 @@ NEW_LINE = "\n"
 SEMI_COLON = '; '
 
 # DEEPPAVLOV SPECIFIC
-PUNCT_RELATION = 'punct'
+PUNCT_RELATION = 'punct' # 'PUNC' - for parusPipe
 NUM_POS = 'NUM'
 ADJ_POS = 'ADJ'
 NOUN_POS = 'NOUN'
 PROPN_POS = 'PROPN'
 
-SENT_NUM = 5000
-WORDS_IN_SENT = 25
-WORD_LIMIT = 5  # 5
+# PARUS_PIPE SPECIFIC - was used at the start, but then switched to deeppavlov
+# PUNCT_RELATION = 'PUNC'
+# NUM_POS = 'M'
 
-# sum({your_key: res2[your_key] for your_key in range(51, max(res2.keys())) if your_key in res2.keys()}.values())
+SENT_NUM = 5000
+WORDS_IN_SENT = 35
+WORD_LIMIT = 8  # 5

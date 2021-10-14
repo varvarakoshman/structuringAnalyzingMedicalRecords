@@ -12,6 +12,8 @@ pattern_year = re.compile('^[0-9]{4}$')
 pattern_full_date = re.compile('^([0-9]+\.){2}[0-9]+$')
 pattern_part_date = re.compile('^[0-9]+\.[0-9][1-9]+$')
 only_letters = re.compile("^[a-zA-Z]+$")
+
+df_columns = ['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel', 'toDelete1', 'toDelete2']
 months = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь',
               'декабрь']
 day_times = ['утро', 'день', 'вечер', 'ночь']
@@ -19,6 +21,7 @@ seasons = ['лето', 'осень', 'зима', 'весна']
 time_labels = ['год', 'г', 'месяц', 'неделя', 'сутки', 'день', 'час', 'минута', 'секунда']
 
 
+# read partly parsed Vidal reference book and do pre-processing before usage
 def read_vidal():
     df_columns = ['INN', 'MNN', 'DrugsSingle', 'DrugsMultiple', 'Group', 'Interactions', 'Indications', 'Contraindications']
     with open('data/dataset_vidal_inns.csv', encoding='utf-8') as f:
@@ -30,44 +33,37 @@ def read_vidal():
     df.to_csv("medicalTextTrees/vidal.csv", sep=',', encoding='utf-8')
 
 
-def read_data():
-    # files = os.listdir(DATA_PATH)
-    files = os.listdir(PARSED_RAW_PAVLOV_UNIQUE)
-    df_columns = ['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel', 'toDelete1', 'toDelete2']
-    # len_30 = ['100701_2', '112228_5', '233471_2', '339012_3', '366067_1', '109912_0', '255861_0', '281689_1', '148632_19', '192213_6', '246011_9', '254050_32', '359728_3', '361037_9', '368882_3_1', '361086_8', '152888_21_1', '129821_30', '270150_19', '246011_11', '221783_0_1', '227529_2', '266948_0_1', '359728_6', '361175_2', '51183_6']
-    # len_30 = ['100701_2', '112228_5', '233471_2', '339012_3', '366067_1', '109912_0', '255861_0', '281689_1', '148632_19', '192213_6', '246011_9', '254050_32', '359728_3']
+# walk though the files in the specified directory and map content to a df with specified columns
+def _read_folder_to_df(folder, df_columns):
+    files = os.listdir(folder)
     stable_df = []
-    # long_df = []
-    unique_sents = {}
     for file in files:
         if file != 'Store':
-            # full_dir = os.path.join(DATA_PATH, file)
             full_dir = os.path.join(PARSED_RAW_PAVLOV_UNIQUE, file)
             name = file.split('.')[0]
             with open(full_dir, 'rb') as f:
                 this_df = pd.read_csv(f, sep='\t', names=df_columns)
-                # this_df_filtered = this_df[this_df.deprel != 'PUNC']
-                this_df_filtered = this_df[this_df.deprel != PUNCT_RELATION.lower()]
-                if this_df['id'].duplicated().any():
+                this_df_filtered = this_df[this_df.deprel != PUNCT_RELATION.lower()]  # filter nodes with punctuation
+                if this_df['id'].duplicated().any():  # in one sentence can be found multiple syntactic subtrees
                     start_of_subtree_df = list(this_df.groupby(this_df.id).get_group(1).index)
                     boundaries = start_of_subtree_df + [max(list(this_df.index)) + 1]
                     list_of_dfs = [this_df.iloc[boundaries[n]:boundaries[n + 1]] for n in range(len(boundaries) - 1)]
                     local_counter = 1
                     for df in list_of_dfs:
                         df['sent_name'] = name + UNDERSCORE + str(local_counter)
-                        # full_df.append(df)
                         stable_df.append(df)
                         local_counter += 1
                 else:
                     this_df['sent_name'] = name
-                    # stable_df.append(this_df)           # for strong equality
                     if this_df_filtered.shape[0] < WORDS_IN_SENT:         # for word2vec
                         stable_df.append(this_df)
-                    # else:
-                    #     long_df.append(this_df)
-                    # full_df.append(this_df)
+    return stable_df
+
+
+# leave only non-repeating sentences in df
+def _filter_unique_sents(stable_df):
     dfs_grouped_by = {}
-    for df in stable_df: # replace to full
+    for df in stable_df:
         sent_len = len(df)
         if sent_len not in dfs_grouped_by.keys():
             dfs_grouped_by[sent_len] = [df]
@@ -80,19 +76,20 @@ def read_data():
             sent_history = []
             for df in dfs:
                 if list(df.form)[0] == list(df.form)[0] and len(df) > 1:
-                    try:
-                        sent_words = SPACE.join(list(df.form))
-                    except TypeError as te:
-                        ggg = []
-                    # dfs_filtered.append(df)
+                    sent_words = SPACE.join(list(df.form))
                     if sent_words not in sent_history and not sent_count > SENT_NUM:
                         sent_count += 1
                         sent_history.append(sent_words)
                         dfs_filtered.append(df)
-    # trees_df = pd.concat(stable_df, axis=0, ignore_index=True)
+    return dfs_filtered
+
+
+# util method for debug purposes
+# compute stats on num of unique sentences and distribution of sentences' lengths
+def _compute_some_stats(dfs_filtered):
+    unique_sents = {}
     len_sent = {}
     for df in dfs_filtered:
-        # this_df = df[df.deprel != 'PUNC']
         this_df = df[df.deprel != PUNCT_RELATION]
         sent_n = list(this_df.sent_name)[0]
         words = list(this_df.form)
@@ -107,71 +104,53 @@ def read_data():
         else:
             unique_sents[sent] += 1
 
+
+# delete useless columns, relations of type PUNC and reindex
+def _remove_meta_info(dfs_filtered):
     trees_df = pd.concat(dfs_filtered, axis=0, ignore_index=True)
-    # long_df = pd.concat(long_df, axis=0, ignore_index=True)
-    # delete useless data
     trees_df = trees_df.drop(columns=['xpostag', 'toDelete1', 'toDelete2'], axis=1)
-    # trees_df.drop(index=[11067], inplace=True)
-    # trees_df.loc[13742, 'deprel'] = 'разъяснит' !!!
-
-    # delete relations of type PUNC and reindex
-
-    # long_df = long_df.drop(columns=['xpostag', 'feats'], axis=1)
-    # long_df_filtered = long_df[long_df.deprel != 'PUNC']
-    # long_df_filtered = long_df_filtered.reset_index(drop=True)
-    # long_df_filtered.index = long_df_filtered.index + 1
-
-    # trees_df_filtered = trees_df[trees_df.deprel != 'PUNC']
-    strange_sentences = ['143096_4', '306218_1', '250555_5', '129889_5', '331269_13']
+    strange_sentences = ['143096_4', '306218_1', '250555_5', '129889_5', '331269_13']  # TODO: seach for broken sentences should be automated !
     trees_df = trees_df.loc[~trees_df.sent_name.isin(strange_sentences)]
     trees_df_filtered = trees_df[trees_df.deprel != PUNCT_RELATION]
     trees_df_filtered = trees_df_filtered.reset_index(drop=True)
     trees_df_filtered.index = trees_df_filtered.index + 1
-    # trees_df_filtered.loc[12239, 'deprel'] = '1-компл'
-    # trees_df_filtered.loc[12239, 'head'] = 2
-    #
-    # trees_full_df = pd.concat(full_df, axis=0, ignore_index=True)
-    # trees_full_df = trees_full_df.reset_index(drop=True)
-    # trees_full_df.index = trees_full_df.index + 1
-    # trees_full_df.drop(columns=['upostag', 'xpostag', 'feats'], axis=1)
-    # trees_full_df = trees_full_df[trees_full_df.deprel != 'PUNC']
+    return trees_df_filtered
 
-    # replaced_numbers = [k for k, v in trees_full_df.lemma.str.contains('#').to_dict().items() if
-    #                     v == True]
-    # for num in replaced_numbers:
-    #     trees_full_df.loc[num, 'upostag'] = 'Num'
 
-    replaced_numbers = [k for k, v in trees_df_filtered.lemma.str.contains('#').to_dict().items() if v == True]
+def read_data():
+    stable_df = _read_folder_to_df(PARSED_RAW_PAVLOV_UNIQUE, df_columns)
+    dfs_filtered = _filter_unique_sents(stable_df)
+    # compute_some_stats(dfs_filtered) # - for development only
+    trees_df_filtered = _remove_meta_info(dfs_filtered)
+    return trees_df_filtered
+
+
+def replace_time_constructions(df):
+    for month in months:
+        df.loc[df['lemma'] == month, 'lemma'] = '#месяц'
+    for day_time in day_times:
+        df.loc[df['lemma'] == day_time, 'lemma'] = '#времясуток'
+    for season in seasons:
+        df.loc[df['lemma'] == season, 'lemma'] = '#сезон'
+    df['lemma'] = df['lemma'].apply(_func)
+    # replacement is needed mostly to change (month -> Noun) to (month -> Num)
+    # and ensure there are no errors in parsing
+    replaced_numbers = [k for k, v in df.lemma.str.contains('#').to_dict().items() if v == True]
     for num in replaced_numbers:
-        # trees_df_filtered.loc[num, 'upostag'] = 'M'
-        trees_df_filtered.loc[num, 'upostag'] = NUM_POS
+        df.loc[num, 'upostag'] = NUM_POS
 
-    # target_sents = list({'43829_4', '46581_0', '300424_0'})
-    # target_sents = list({'44112_8', '55654_2', '32867_6', '57809_7'})  # TEST
-    # target_sents = list({'55654_2', '35628_5', '32867_6', '57809_7', '57126_7'})  # TEST
-    # target_sents = list({'93475_10_0', '106014_10', '128080_6', '162141_8', '56964_3', '56661_2', '37462_5', '34118_3', '152369_9', '41999_1', '263735_1', '281575_1'})  # TEST
-    # target_sents = list({'57809_7', '57126_7'})  # TEST
-    # target_sents = list({'55338_41', '58401_7'})  # TEST
-    # target_sents = list({'46855_3', '48408_0', '37676_3', '56109_5', '56661_0', '54743_1'}) # TEST !!!!trickyyyy
-    # target_sents = list({'37535_4', '31635_2', '39786_8'}) # TEST !!!!trickyyyy
-    # target_sents = list({'48408_0', '37676_3', '32191_0', '56109_5', '56661_0', '54743_1'}) # TEST
-    # target_sents = list({'46855_3', '37676_3'})  # TEST !!!!!!!!
-    # target_sents = list({'46855_3', '37676_3', '54743_1'})  # TEST
-    # target_sents = list({'58282_3', '46855_3', '37676_3'}) # TEST
-    # target_sents = list({'32191_2', '58282_3', '55066_0', '46855_3', '48408_0'})
-    # target_sents = list({'53718_0', '46007_0', '56109_2', '41184_0'}) # test for plain
-    # target_sents = list({'167529_9', '152369_9', '172030_9', '172030_23', '48408_0'}) # meeeeeess
 
-    # test_df = trees_df_filtered.loc[trees_df_filtered.sent_name.isin(target_sents)] # TEST
-    # trees_full_df.loc[trees_full_df.index.isin(replaced_numbers)].assign(upostag = 'N')
-
-    # trees_df_filtered = trees_df_filtered.head(513)
-    # trees_df_filtered = trees_df_filtered.head(339)
-    # trees_df_filtered = trees_df_filtered.head(411)
-    # trees_df_filtered = trees_df_filtered.head(431)
-    # trees_df_filtered = trees_df_filtered.head(4824)
-    # trees_df_filtered = trees_df_filtered[:7357]
-    return trees_df_filtered#, test_df
+def _func(lemma):
+    if not pd.isnull(lemma):
+        if pattern_year.match(lemma):
+            return '#год'
+        elif pattern_full_date.match(lemma):
+            return '#пдата'
+        elif pattern_part_date.match(lemma):
+            return '#чдата'
+        elif lemma == '@card@':
+            return '#число'
+    return lemma
 
 
 # PRE-PROCESSING
@@ -183,7 +162,6 @@ def read_data():
 # fix 2) and 3) manually and then run the main algorithm, which will walk through these directories and add all files.
 def sort_the_data():
     files = os.listdir(DATA_PATH)
-    df_columns = ['id', 'form', 'lemma', 'upostag', 'xpostag', 'feats', 'head', 'deprel']
     for file in files:
         full_dir = os.path.join(DATA_PATH, file)
         with open(full_dir, encoding='utf-8') as f:
@@ -196,29 +174,6 @@ def sort_the_data():
             shutil.copy(os.path.join(ORIGINAL_DATA_PATH, DOT.join([name_split[0], name_split[1]])), LONG_DATA_PATH)
         else:
             shutil.copy(full_dir, STABLE_DATA_PATH)
-
-
-def replace_time_constructions(df):
-    for month in months:
-        df.loc[df['lemma'] == month, 'lemma'] = '#месяц'
-    for day_time in day_times:
-        df.loc[df['lemma'] == day_time, 'lemma'] = '#времясуток'
-    for season in seasons:
-        df.loc[df['lemma'] == season, 'lemma'] = '#сезон'
-    df['lemma'] = df['lemma'].apply(func)
-
-
-def func(lemma):
-    if not pd.isnull(lemma):
-        if pattern_year.match(lemma):
-            return '#год'
-        elif pattern_full_date.match(lemma):
-            return '#пдата'
-        elif pattern_part_date.match(lemma):
-            return '#чдата'
-        elif lemma == '@card@':
-            return '#число'
-    return lemma
 
 
 # compare new sentences with existent, pick ones that don't duplicate

@@ -17,6 +17,8 @@ pattern = re.compile('^#.+$')
 english_letters = re.compile("^[a-zA-Z]+$")
 special_chars = re.compile("^[!@#$%^&*(())___+]+$")
 
+get_lemma = lambda dict_lemmas_rev, whole_tree_plain, node_id: dict_lemmas_rev[whole_tree_plain.get_node(node_id).lemma]
+
 
 def train_word2vec(trees_df_filtered):
     lemma_sent_df = trees_df_filtered[['lemma', 'sent_name']]
@@ -26,14 +28,7 @@ def train_word2vec(trees_df_filtered):
         for _, row in group.iterrows():
             lemma_sent_dict[name].append(row['lemma'])
     sentences = list(lemma_sent_dict.values())
-
-    medical_model = Word2Vec(min_count=1)
-    medical_model.build_vocab(sentences)
-
-    additional_model = KeyedVectors.load_word2vec_format(ADDITIONAL_CORPUS_PATH, binary=True, unicode_errors='ignore')
-    medical_model.build_vocab([list(additional_model.vocab.keys())[:UPPER_BOUND_ADDITIONAL_DATA]], update=True)
-    medical_model.intersect_word2vec_format(ADDITIONAL_CORPUS_PATH, binary=True, lockf=1.0, unicode_errors='ignore')
-    medical_model.train(sentences, total_examples=medical_model.corpus_count, epochs=medical_model.iter)
+    medical_model = create_train_w2v_model(sentences)
     medical_model.save("trained.model")
 
 
@@ -45,67 +40,36 @@ def train_node2vec_db(all_edges):
         "source": sources,
         "target": targets
     })
-    stellar_graph = StellarDiGraph(edges=edges)
-    random_walk = BiasedRandomWalk(stellar_graph)
-    weighted_walks = random_walk.run(
-        nodes=stellar_graph.nodes(),  # root nodes
-        length=walk_length,  # maximum length of a random walk
-        n=3,  # number of random walks per root node
-        p=1,  # Defines (unormalised) probability, 1/p, of returning to source node
-        q=2,  # Defines (unormalised) probability, 1/q, for moving away from source node
-        weighted=True,  # for weighted random walks
-        seed=42,  # random seed fixed for reproducibility
-    )
-    print("Number of random walks: {}".format(len(weighted_walks)))
-    weighted_model = Word2Vec(min_count=1)
-    weighted_model.build_vocab(weighted_walks)
-    additional_model = KeyedVectors.load_word2vec_format(ADDITIONAL_CORPUS_PATH, binary=True, unicode_errors='ignore')
-    weighted_model.build_vocab([list(additional_model.vocab.keys())[:UPPER_BOUND_ADDITIONAL_DATA]], update=True)
-    weighted_model.intersect_word2vec_format(ADDITIONAL_CORPUS_PATH, binary=True, lockf=1.0, unicode_errors='ignore')
-    weighted_model.train(weighted_walks, total_examples=weighted_model.corpus_count, epochs=weighted_model.iter)
+    weighted_walks = run_random_walks(edges, [walk_length, 3, 1, 2], False)
+    weighted_model = create_train_w2v_model(weighted_walks)
     weighted_model.save("trained_node2vec_db.model")
 
 
-def train_node2vec(whole_tree_plain, dict_lemmas_rev):
+def train_node2vec(tree, dict_lemmas_rev):
     walk_length = 5
     # filtered_edges = list(filter(lambda edge: edge.node_from != 0, whole_tree_plain.edges))
     dict_lemmas_rev[0] = 'root'
-    sources = list(map(lambda edge: dict_lemmas_rev[whole_tree_plain.get_node(edge.node_from).lemma], whole_tree_plain.edges))
-    targets = list(map(lambda edge: dict_lemmas_rev[whole_tree_plain.get_node(edge.node_to).lemma], whole_tree_plain.edges))
-    weights = list(map(lambda edge: edge.weight, whole_tree_plain.edges))
+    sources = list(map(lambda edge: get_lemma(dict_lemmas_rev, tree, edge.node_from), tree.edges))
+    targets = list(map(lambda edge: get_lemma(dict_lemmas_rev, tree, edge.node_to), tree.edges))
+    weights = list(map(lambda edge: edge.weight, tree.edges))
     edges = pd.DataFrame({
         "source": sources,
         "target": targets,
         "weight": weights
     })
-    stellar_graph = StellarDiGraph(edges=edges)
-    random_walk = BiasedRandomWalk(stellar_graph)
-    weighted_walks = random_walk.run(
-        nodes=stellar_graph.nodes(),  # root nodes
-        length=walk_length,  # maximum length of a random walk
-        n=5,  # number of random walks per root node
-        p=2,  # Defines (unormalised) probability, 1/p, of returning to source node
-        q=3,  # Defines (unormalised) probability, 1/q, for moving away from source node
-        weighted=True,  # for weighted random walks
-        seed=42,  # random seed fixed for reproducibility
-    )
-    print("Number of random walks: {}".format(len(weighted_walks)))
-    weighted_model = Word2Vec(min_count=1)#, sg=1)
-    weighted_model.build_vocab(weighted_walks)
-    additional_model = KeyedVectors.load_word2vec_format(ADDITIONAL_CORPUS_PATH, binary=True, unicode_errors='ignore')
-    weighted_model.build_vocab([list(additional_model.vocab.keys())[:UPPER_BOUND_ADDITIONAL_DATA]], update=True)
-    weighted_model.intersect_word2vec_format(ADDITIONAL_CORPUS_PATH, binary=True, lockf=1.0, unicode_errors='ignore')
-    weighted_model.train(weighted_walks, total_examples=weighted_model.corpus_count, epochs=weighted_model.iter)
-    weighted_model.save("trained_final.model")
+    weighted_walks = run_random_walks(edges, [walk_length, 5, 2, 3], True)
+    weighted_model = create_train_w2v_model(weighted_walks)
+    model_name = "trained_final.model"
+    weighted_model.save(model_name)
+    return model_name
 
 
-# for disambiguation!!
-def train_node2vec_joined(whole_tree_plain, db_edges, dict_lemmas_rev):
+# for disambiguation /draft, not currently used/
+def train_node2vec_joined(tree, db_edges, dict_lemmas_rev):
     walk_length = 6
-    # filtered_edges = list(filter(lambda edge: edge.node_from != 0, whole_tree_plain.edges))
     dict_lemmas_rev[0] = 'root'
-    sources = list(map(lambda edge: dict_lemmas_rev[whole_tree_plain.get_node(edge.node_from).lemma], whole_tree_plain.edges))
-    targets = list(map(lambda edge: dict_lemmas_rev[whole_tree_plain.get_node(edge.node_to).lemma], whole_tree_plain.edges))
+    sources = list(map(lambda edge: get_lemma(dict_lemmas_rev, tree, edge.node_from), tree.edges))
+    targets = list(map(lambda edge: get_lemma(dict_lemmas_rev, tree, edge.node_to), tree.edges))
     # weights = list(map(lambda edge: edge.weight, whole_tree_plain.edges))
     sources_db = list(map(lambda edge: edge.node_from, db_edges))
     targets_db = list(map(lambda edge: edge.node_to, db_edges))
@@ -114,30 +78,43 @@ def train_node2vec_joined(whole_tree_plain, db_edges, dict_lemmas_rev):
         "target": targets + targets_db,
         # "weight": weights + [1] * len(sources_db)
     })
+    weighted_walks = run_random_walks(edges, [walk_length, 3, 4, 6], False)
+    weighted_model = create_train_w2v_model(weighted_walks)
+    model_name = "trained_node2vec_joined.model"
+    weighted_model.save(model_name)
+    return model_name
+
+
+def run_random_walks(edges, parameters, is_weighted):
     stellar_graph = StellarDiGraph(edges=edges)
     random_walk = BiasedRandomWalk(stellar_graph)
+    walk_length, n, p, q = parameters
     weighted_walks = random_walk.run(
         nodes=stellar_graph.nodes(),  # root nodes
         length=walk_length,  # maximum length of a random walk
-        n=3,  # number of random walks per root node
-        p=4,  # Defines (unormalised) probability, 1/p, of returning to source node
-        q=6,  # Defines (unormalised) probability, 1/q, for moving away from source node
-        # weighted=True,  # for weighted random walks
+        n=n,  # number of random walks per root node
+        p=p,  # Defines (unormalised) probability, 1/p, of returning to source node
+        q=q,  # Defines (unormalised) probability, 1/q, for moving away from source node
+        weighted=is_weighted,  # for weighted random walks
         seed=42,  # random seed fixed for reproducibility
     )
     print("Number of random walks: {}".format(len(weighted_walks)))
+    return weighted_walks
+
+
+def create_train_w2v_model(weighted_walks):
     weighted_model = Word2Vec(min_count=1)
     weighted_model.build_vocab(weighted_walks)
     additional_model = KeyedVectors.load_word2vec_format(ADDITIONAL_CORPUS_PATH, binary=True, unicode_errors='ignore')
     weighted_model.build_vocab([list(additional_model.vocab.keys())[:UPPER_BOUND_ADDITIONAL_DATA]], update=True)
     weighted_model.intersect_word2vec_format(ADDITIONAL_CORPUS_PATH, binary=True, lockf=1.0, unicode_errors='ignore')
     weighted_model.train(weighted_walks, total_examples=weighted_model.corpus_count, epochs=weighted_model.iter)
-    weighted_model.save("trained_node2vec_joined.model")
+    return weighted_model
 
 
-def load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, model_name): #dict_lemmas_filt,
+def load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, model_name, lemmas_to_exclude_str):
     medical_model = Word2Vec.load(model_name)
-    similar_dict = {lemma: medical_model.most_similar(lemma, topn=15) for lemma in dict_lemmas_full if not pattern.match(lemma)}
+    similar_dict = {lemma: medical_model.most_similar(lemma, topn=15) for lemma in dict_lemmas_full if not pattern.match(lemma) and lemma not in lemmas_to_exclude_str}
     similar_lemmas_dict = {}
     for lemma, similar_lemmas in similar_dict.items():
         for similar_lemma, cosine_dist in similar_lemmas:

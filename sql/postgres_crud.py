@@ -6,7 +6,6 @@ insert_main_query = """INSERT INTO wiki_main_entity (q_id, entity_label, entity_
 insert_ref_query = """INSERT INTO wiki_ref_entity (entity_label, q_id) VALUES (%s, %s)"""
 # noinspection SqlDialectInspection
 select_qids_query = """select q_id from wiki_main_entity"""
-
 # noinspection SqlDialectInspection
 select_main_qid_names_query = """select q_id, entity_label from wiki_main_entity"""
 # noinspection SqlDialectInspection

@@ -7,7 +7,7 @@ from pymystem3 import Mystem
 
 from WikidataEntity import WikidataEntity
 from const.Constants import EMPTY_STR
-from sql.postgres_repo import get_entity_fields, save_entity, select_qids_query, update_entity, \
+from sql.postgres_crud import get_entity_fields, save_entity, select_qids_query, update_entity, \
     update_main_normal_label, select_main_qid_names_query, update_ref_normal_label, select_ref_qid_names_query
 
 medical_properties = ["P636", "P673", "P486", "P715", "P699", "P780", "P923", "P924", "P2452", "P1748", "P557",

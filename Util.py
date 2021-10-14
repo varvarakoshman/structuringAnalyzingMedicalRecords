@@ -19,7 +19,7 @@ from Tree import Edge
 from WikidataEntity import WikidataEntity
 from const.Constants import *
 from Preprocessing import time_labels
-from sql.postgres_repo import get_entity_fields, select_all_ref, select_all_main
+from sql.postgres_crud import get_entity_fields, select_all_ref, select_all_main
 
 pattern_verb_check = re.compile('(([Z])*([QIRPCS])*)+')
 pattern_help_verbs_in_row = re.compile("^Z{2,}.*$")
@@ -215,21 +215,23 @@ def filter_classes(classes_part, classes_part_list, whole_tree, remapped_sent_re
     return classes_wordgroups_filtered, classes_sents_filtered
 
 
+# PART - частица
+# ADP - предлог
+# SCONJ - подчинительный союз
+# CCONJ - сочинительный союз
+# ADV - наречие
+# DET - местоимение
+# AUX - вспомогательный глагол
+# PRON - местоимение 2.0
+# X - другое (например, странные сокращения)
+
 # filter long subsequences of prepositions
 def check1st(node_sequence):
     seq_pos_tags = list(map(lambda node: node.pos_tag, node_sequence))
-    target_indices = [index for index, pos_tag in enumerate(seq_pos_tags) if pos_tag == 'S' or pos_tag == 'C']
+    meaningless_postags = ['PART', 'ADP', 'SCONJ', 'CCONJ', 'ADV', 'DET', 'AUX', 'PRON', 'X']
+    target_indices = [index for index, pos_tag in enumerate(seq_pos_tags) if pos_tag in meaningless_postags]  # 'S', 'C' - parus
     if len(target_indices) > 0:
-        # prep_max_len = 0
-        # curr_len = 1
-        # for i in range(0, len(target_indices) - 1):
-        #     if target_indices[i + 1] - target_indices[i] == 1:
-        #         curr_len += 1
-        #     else:
-        #         curr_len = 1
-        #     if curr_len > prep_max_len:
-        #         prep_max_len = curr_len
-        if len(target_indices) > len(seq_pos_tags) - len(target_indices):
+        if len(target_indices) >= len(seq_pos_tags) - len(target_indices):
             return False  # filter if a sequence of prepositions takes the most of a string
     return True
 
