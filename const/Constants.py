@@ -8,7 +8,7 @@ ADDITIONAL_CORPUS_PATH = "additionalCorpus/all_norm-sz100-w10-cb0-it1-min100.w2v
 EXCEL_EDGES_GEPHI_PATH = "medicalTextTrees/gephi_edges_import.csv"
 EXCEL_NODES_GEPHI_PATH = "medicalTextTrees/gephi_nodes_import.csv"
 MERGED_PATH = "medicalTextTrees/merged_extended.txt"
-MERGED_PATH_FILTERED = "medicalTextTrees/merged_extended_filtered.txt"
+MERGED_PATH_FILTERED = "medicalTextTrees/merged_extended_old.txt"
 MERGED_PATH_OLD = "medicalTextTrees/merged_extended_old.txt"
 CLASSIFIED_DATA_PATH = "medicalTextTrees/classified_sentences"
 LONG_DATA_PATH = "medicalTextTrees/classified_sentences/long_sentences"
@@ -31,9 +31,9 @@ ALGO_RESULT_N2V_FILT = "medicalTextTrees/algo_results_filtered/merged_extended_n
 # Word2vec training constants
 UPPER_BOUND_ADDITIONAL_DATA = 50000
 HIGH_COSINE_DIST = 0.75
-LOAD_TRAINED = False
+LOAD_TRAINED = True
 RUN_WITH_W2V = True
-WRITE_IN_FILES = True
+WRITE_IN_FILES = False
 
 # Additional constants
 EMPTY_STR = ""
@@ -57,4 +57,4 @@ PROPN_POS = 'PROPN'
 
 SENT_NUM = 5000
 WORDS_IN_SENT = 35
-WORD_LIMIT = 8  # 5
+WORD_LIMIT = 5  # 5

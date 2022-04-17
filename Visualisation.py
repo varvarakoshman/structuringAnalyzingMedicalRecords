@@ -1,7 +1,9 @@
 import re
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 from gensim.models import Word2Vec
 # w2v.init_sims(replace=True)
 # russian_model = download_api.load('word2vec-ruscorpora-300')
@@ -26,8 +28,8 @@ from gensim.models import Word2Vec
 from matplotlib import pyplot
 from sklearn.manifold import TSNE
 
-from const.Constants import EMPTY_STR, NEW_LINE, VIS_PATH_N2V, ALGO_RESULT_N2V_FILT, ALGO_RESULT_N2V, MERGED_PATH
 from Preprocessing import replace_time_constructions, read_data, read_vidal
+from const.Constants import EMPTY_STR, NEW_LINE, VIS_PATH_N2V, MERGED_PATH, SPACE
 
 
 # dict(sorted(similar_lemmas_dict_filtered.items(), key=lambda item: len(item[1]), reverse=True))
@@ -242,19 +244,89 @@ def draw_histogram():
             label.set_visible(False)
     plt.show()
 
-    # res_len = dict(sorted(res_len.items(), key=lambda x: x[0]))
-    # alphab = list(res_len.values())
-    # frequencies = list(res_len.keys())
-    #
+
+def plot_labels_per_sentences(sent_labels):
+    sent_labels = dict(sorted(sent_labels.items(), key=lambda entry: len(entry[1]), reverse=False))
+    MEDIUM_SIZE = 12
+    BIGGER_SIZE = 14
+    # plt.rc('font', size=MEDIUM_SIZE)  # controls default text sizes
+    plt.rc('axes', titlesize=BIGGER_SIZE)  # fontsize of the axes title
+    plt.rc('axes', labelsize=BIGGER_SIZE)  # fontsize of the x and y labels
+    plt.rc('xtick', labelsize=MEDIUM_SIZE)  # fontsize of the tick labels
+    plt.rc('ytick', labelsize=MEDIUM_SIZE)  # fontsize of the tick labels
+    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+    count_dict = {}
+    sent_num_labels = {k: len(v) for k, v in sent_labels.items()}
+    for sent, num_labels in sent_num_labels.items():
+        if num_labels not in count_dict.keys():
+            count_dict[num_labels] = 1
+        else:
+            count_dict[num_labels] += 1
+    numb_of_sentences_for_each_num_of_labels = list(count_dict.values())
+    frequencies = list(count_dict.keys())
+    pos1 = np.arange(len(frequencies))
+
+    # hardcode to make a plot look nicer
+    # frequencies = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12-17"] # change values accordingly
     # pos1 = np.arange(len(frequencies))
-    # ax1 = plt.axes()
-    # ax1.set_xticks(pos1)
-    # ax1.set_xticklabels(frequencies)
-    # ax1.set_xlabel('Число слов в повторе')
-    # ax1.set_ylabel('Число классов')
-    # plt.bar(pos1, alphab, width=0.4, color='b')
-    # plt.title('Число классов с равным числом слов в повторе')
-    # plt.show()
+    # numb_of_sentences_for_each_num_of_labels = [826, 933, 841, 719, 551, 377, 219, 163, 104, 63, 28, 21]
+
+    ax1 = plt.axes()
+    ax1.grid(False)
+    ax1.set_xticks(pos1)
+    ax1.set_xticklabels(frequencies)
+    ax1.set_xlabel('Number of labels', fontsize=12)
+    ax1.set_ylabel('Number of sentences', fontsize=12)
+    plt.title('Number of labels per sentence', fontsize=12)
+    plt.bar(pos1, numb_of_sentences_for_each_num_of_labels, width=0.9, color='blue')
+    plt.show()
+
+
+def plot_repeat_len(results_dict):
+    MEDIUM_SIZE = 12
+    BIGGER_SIZE = 14
+    # plt.rc('font', size=MEDIUM_SIZE)  # controls default text sizes
+    plt.rc('axes', titlesize=BIGGER_SIZE)  # fontsize of the axes title
+    plt.rc('axes', labelsize=BIGGER_SIZE)  # fontsize of the x and y labels
+    plt.rc('xtick', labelsize=MEDIUM_SIZE)  # fontsize of the tick labels
+    plt.rc('ytick', labelsize=MEDIUM_SIZE)  # fontsize of the tick labels
+    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+    count_dict = {}
+    class_id_len = {k: len(v[0].split(SPACE)) for k, v in results_dict.items()}
+    for class_id, leng in class_id_len.items():
+        if leng not in count_dict.keys():
+            count_dict[leng] = 1
+        else:
+            count_dict[leng] += 1
+    alphab = list(count_dict.values())
+    frequencies = list(count_dict.keys())
+    pos1 = np.arange(len(frequencies))
+    ax1 = plt.axes()
+    ax1.set_xticks(pos1)
+    ax1.set_xticklabels(frequencies)
+    ax1.set_xlabel('Number of words in a repeat', fontsize=12)
+    ax1.set_ylabel('Number of groups', fontsize=12)
+    plt.bar(pos1, alphab, width=0.9, color='b')
+    plt.title('Number of groups with equal number of words in a repeat', fontsize=12)
+    plt.show()
+
+
+def plot_top_30_labels(label_classes_sorted):
+    label_classes_simple = {k: len(v) for k, v in label_classes_sorted.items()}
+    top_30 = list(label_classes_simple.items())[-30:]
+    labels = [item[0] for item in top_30]
+    counts = [item[1] for item in top_30]
+    joint_dict = dict(sorted({labels[i]: counts[i] for i in range(30)}.items(), key=lambda x: x[1], reverse=True))
+    joint_df = pd.DataFrame({'label': list(joint_dict.keys()), 'count': list(joint_dict.values())})
+    ax = sns.barplot(x='count', y='label',
+                     data=joint_df,
+                     palette="crest")
+    ax.set(xlabel='count', ylabel='label')
+    plt.figure(figsize=(10, 8))
+    sns.set_theme(style="whitegrid")
+    sns.despine(left=True, bottom=True)
+    plt.tight_layout()
+    plt.show()
 
 
 if __name__ == '__main__':

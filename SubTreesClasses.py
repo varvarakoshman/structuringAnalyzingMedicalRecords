@@ -4,15 +4,18 @@ from itertools import combinations, product
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import pandas as pd
 
 from Preprocessing import read_data, replace_time_constructions, pick_new_sentences
 from Tree import Tree, Node, Edge
 from Util import merge_in_file, filter_classes, write_classes_in_txt, filter_meaningless_classes, get_all_words, \
     label_classes, \
     squash_classes, \
-    label_data_with_wiki, construct_db_tree, draw_db_network, get_all_wikidata_entities
-from Visualisation import draw_histogram
-from W2Vprocessing import load_trained_word2vec, train_node2vec, train_node2vec_db, train_node2vec_joined
+    label_data_with_wiki, construct_db_tree, draw_db_network, get_all_wikidata_entities, get_joint_lemmas, \
+    get_joint_lemmas_n2v_only, write_labels_for_sentences
+from Visualisation import draw_histogram, plot_labels_per_sentences, plot_top_30_labels
+from W2Vprocessing import load_trained_word2vec, train_node2vec, train_node2vec_db, train_node2vec_joined, \
+    visualize_embeddings, train_word2vec
 from const.Constants import *
 
 
@@ -718,7 +721,7 @@ def postprocess_and_label(classes_part, classes_part_list, whole_tree, dict_lemm
     meaningful_classes_filtered_squashed, new_classes_mapping = squash_classes(whole_tree, meaningful_classes_filtered, dict_lemmas_full_new_labels, dict_form_lemma_int)
     meaningful_classes_filtered_squashed_sort = dict(sorted(meaningful_classes_filtered_squashed.items(), key=lambda x: len(x[1]), reverse=True))
     class_id_labels, new_class_id_label = label_data_with_wiki(meaningful_classes_filtered_squashed_sort, dict_form_lemma_str, class_labels, new_classes_mapping)
-    return meaningful_classes_filtered_squashed_sort, class_id_labels, new_classes_mapping, new_class_id_label
+    return meaningful_classes_filtered_squashed_sort, class_id_labels, new_classes_mapping, new_class_id_label, class_labels
 
 
 def group_classes_by_labels(class_id_labels, class_labels):
@@ -799,7 +802,26 @@ def train_db_model(whole_tree_plain, dict_lemmas_full, part_of_speech_node_id, d
     load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, "trained_node2vec_joined.model", [])  # node2vec # not needed
 
 
+def calc_labels():
+    try:
+        with open('sentences_labels_500.txt', 'r', encoding='utf-8') as reader:
+            class_entries = reader.readlines()
+    finally:
+        reader.close()
+    to_exclude = {'временнаяметка', 'событие'}
+    result_dict = []
+    for line in class_entries:
+        if line != NEW_LINE:
+            if line.split(":")[0] != 'Предложение ':
+                labels = list(set([word.replace(' ', '').replace('\t', '').replace('\n', '') for word in line.split(":")[1].split(",")]) - to_exclude)
+                result_dict.extend(labels)
+
+
 def annotate_data():
+    calc_labels()
+    start_main = log_start('=== Start of execution ===')
+    # lemmas_list = get_joint_lemmas_n2v_only('medicalTextTrees/n2v_similar_words.txt')
+    # visualize_embeddings(lemmas_list, "trained_final.model", "trained_final.model")
     # READ DATA
     start = log_start('Reading...')
     trees_df_filtered = read_data_to_df()
@@ -829,9 +851,12 @@ def annotate_data():
         model_name = train_node2vec(whole_tree, dict_lemmas_rev)
     else:
         model_name = "trained_final.model"
-    load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, model_name, lemmas_to_exclude_str)  # node2vec
+    model_name = train_word2vec(trees_df_filtered) # pure w2v
+    similar_lemmas_dict_filtered = load_trained_word2vec(dict_lemmas_full, part_of_speech_node_id, model_name, lemmas_to_exclude_str)  # node2vec
     w2v_time = log_end(start)
 
+    lemmas_list = get_joint_lemmas_n2v_only('medicalTextTrees/n2v_similar_words.txt')
+    # visualize_embeddings(lemmas_list, "trained_final.model", "trained_final.model") # FOR PLOTTING VECTOR SPACE
     # FOR TRAINING A DB MODEL
     # if training a db model is needed (currently not used)
     # train_db_model(whole_tree_plain, dict_lemmas_full, part_of_speech_node_id, dict_lemmas_rev)
@@ -843,7 +868,9 @@ def annotate_data():
 
     # POSTPROCESSING AND ANNOTATION
     start = log_start('Postprocessing and annotating...')
-    meaningful_classes_filtered_squashed_sort, class_id_labels, new_classes_mapping, new_class_id_label = postprocess_and_label(classes_part, classes_part_list, whole_tree, dict_lemmas_full, trees_df_filtered, remapped_sent)
+    meaningful_classes_filtered_squashed_sort, class_id_labels, new_classes_mapping, new_class_id_label, class_labels = postprocess_and_label(classes_part, classes_part_list, whole_tree,
+                                                                                                                                dict_lemmas_full, trees_df_filtered,
+                                                                                                                                remapped_sent)
     postprocess_label_time = log_end(start)
 
     # GROUP CLASSES BY LABELS
@@ -852,8 +879,10 @@ def annotate_data():
     classes_sents_filtered = {k: list(map(lambda x: remapped_sent_rev[x[0].sent_name], v)) for k, v in meaningful_classes_filtered_squashed_sort.items()}
     results_dict, result_sent_dict = prepare_results(meaningful_classes_filtered_squashed_sort, classes_sents_filtered)
 
+    classes_dict = list({k: v for k, v in class_labels.items() if
+                         len(v) > 0 and 'Временная метка' not in v and 'Событие' not in v}.keys())
     overall_time = [reading_time, w2v_time, construct_tree_time, algo_time, postprocess_label_time]
-    class_id_labels_full_edited = {k: set([v_i.lower() for v_i in list(v)]) for k, v in class_id_labels_full.items()}
+    class_id_labels_full_edited = {k: set([v_i.lower().strip() for v_i in list(v)]) for k, v in class_id_labels_full.items()}
 
     # NOT NEEDED FOR RUNTIME
     if WRITE_IN_FILES:
@@ -864,60 +893,28 @@ def annotate_data():
 
     num_sentences = len(set(trees_df_filtered['sent_name'].to_list()))
     results = tuple([label_classes_sorted, results_dict, num_sentences, num_classes_labeled, result_sent_dict, class_id_labels_full_edited])
+    # plot_top_30_labels(label_classes_sorted)
+    # sent_labels_sorted = map_sent_to_labels(result_sent_dict, class_id_labels_full_edited)
+    # plot_labels_per_sentences(sent_labels_sorted)
+    # write_labels_for_sentences(trees_df_filtered, sent_labels_sorted)
+    print('=== End of execution ===')
+    print(log_end(start_main))
     return overall_time, results
 
 
-def plot_repeat_len(results_dict):
-    MEDIUM_SIZE = 12
-    BIGGER_SIZE = 14
-    # plt.rc('font', size=MEDIUM_SIZE)  # controls default text sizes
-    plt.rc('axes', titlesize=BIGGER_SIZE)  # fontsize of the axes title
-    plt.rc('axes', labelsize=BIGGER_SIZE)  # fontsize of the x and y labels
-    plt.rc('xtick', labelsize=MEDIUM_SIZE)  # fontsize of the tick labels
-    plt.rc('ytick', labelsize=MEDIUM_SIZE)  # fontsize of the tick labels
-    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-    count_dict = {}
-    class_id_len = {k: len(v[0].split(SPACE)) for k, v in results_dict.items()}
-    for class_id, leng in class_id_len.items():
-        if leng not in count_dict.keys():
-            count_dict[leng] = 1
-        else:
-            count_dict[leng] += 1
-    alphab = list(count_dict.values())
-    frequencies = list(count_dict.keys())
-    pos1 = np.arange(len(frequencies))
-    ax1 = plt.axes()
-    ax1.set_xticks(pos1)
-    ax1.set_xticklabels(frequencies)
-    ax1.set_xlabel('Number of words in a repeat', fontsize=12)
-    ax1.set_ylabel('Number of groups', fontsize=12)
-    plt.bar(pos1, alphab, width=0.9, color='b')
-    plt.title('Number of groups with equal number of words in a repeat', fontsize=12)
-    plt.show()
+def map_sent_to_labels(result_sent_dict, class_id_labels_full_edited):
+    sent_labels = {}
+    for class_id in class_id_labels_full_edited.keys():
+        labels = class_id_labels_full_edited[class_id]
+        sentences = result_sent_dict[class_id]
+        for sent in sentences:
+            if sent not in sent_labels.keys():
+                sent_labels[sent] = set(labels)
+            else:
+                sent_labels[sent].update(labels)
+    sent_labels_sorted = dict(sorted(sent_labels.items(), key=lambda entry: len(entry[1]), reverse=True))
+    return sent_labels_sorted
 
-    import seaborn as sns
-    import pandas as pd
-
-    joint_dict = dict(sorted({labels_en[i]: counts[i] for i in range(30)}.items(), key=lambda x: x[1], reverse=True))
-    joint_df = pd.DataFrame({'label': list(joint_dict.keys()), 'count': list(joint_dict.values())})
-    ax = sns.barplot(x='count', y='label',
-                     data=joint_df,
-                     palette="crest")
-    ax.set(xlabel='count', ylabel='label')
-    plt.figure(figsize=(10, 8))
-    sns.set_theme(style="whitegrid")
-    # sns.set_color_codes("Blues_d")
-    # sns.barplot(x=list(joint_dict.values()), y=list(joint_dict.keys()), palette="crest")
-    sns.despine(left=True, bottom=True)
-    plt.tight_layout()
-    plt.show()
-    # labels_en = ['impaired glucose metabolism', 'mental state', 'medical profession', 'frustration of feelings',
-    #              'psychopathological symptom', 'substance', 'livelihood', 'anatomical structure class type',
-    #              'medical report', 'document', 'organ type', 'cause of death', 'medical specialty',
-    #              'type of laboratory diagnosis', 'institute', 'anatomical structure', 'medical procedure',
-    #              'negative emotion', 'state', 'drug', 'health problem', 'disease characteristic', 'chemical compound',
-    #              'natural satellite', 'symptom', 'medicine', 'biomedical measurand type', 'disease', 'event',
-    #              'time stamp']
 
 def main():
     # pick_new_sentences()

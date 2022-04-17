@@ -8,23 +8,24 @@ import os
 import re
 from collections import defaultdict
 from itertools import permutations
-import networkx as nx
-import netgraph  # pip install netgraph
+
 import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
 import pandas as pd
 from gensim.models import Word2Vec
 
+from Preprocessing import time_labels
 from Tree import Edge
 from WikidataEntity import WikidataEntity
 from const.Constants import *
-from Preprocessing import time_labels
 from sql.postgres_crud import get_entity_fields, select_all_ref, select_all_main
 
 pattern_verb_check = re.compile('(([Z])*([QIRPCS])*)+')
 pattern_help_verbs_in_row = re.compile("^Z{2,}.*$")
 pattern_not_help_verb = r'[^Z]'
 has_russian_letters = re.compile('^.*[а-яА-Я]+.*$')
+import random
 
 
 def create_needed_directories():
@@ -296,7 +297,7 @@ def get_all_words(meaningful_classes, dict_form_lemma):
 
 
 def write_all_lemmas(all_lemmas):
-    filename = ALL_LEMMAS_PATH_W2V
+    filename = ALL_LEMMAS_PATH_N2V
     try:
         with open(filename, 'w', encoding='utf-8') as filehandle:
             for lemma in all_lemmas:
@@ -324,7 +325,7 @@ def write_classes_in_txt(whole_tree, meningful_classes, classes_sents_filtered, 
                     try:
                         filehandle.write("sent=%s: %s\n" % (classes_sents_filtered[class_id][repeat_count], joined_res_str))  # WRONG!!!! SENT!!!!
                     except IndexError as ke:
-                        gggg = []
+                        print(ke)
         finally:
             filehandle.close()
         count += 1
@@ -395,6 +396,18 @@ def get_joint_lemmas(path1, path2):
     cleared_lemmas = list(
         filter(lambda lemma: lemma != '.', list(map(lambda lemma: lemma.split('\n')[0], joint_lemmas))))
     return cleared_lemmas
+
+
+def get_joint_lemmas_n2v_only(path):
+    try:
+        with open(path, 'r', encoding='utf-8') as reader:
+            lemmas = reader.readlines()
+    finally:
+        reader.close()
+    clean_list = []
+    for lemma_list_str in lemmas:
+        clean_list.append(lemma_list_str.split(":")[0].strip())
+    return clean_list
 
 
 def write_dict_in_file(similar_lemmas_dict_filtered):
@@ -516,7 +529,8 @@ def add_label_to_list_csv(df, label_q_id, q_id_categories):
             part = EMPTY_STR if type(row['part_of']) == float and np.isnan(row['part_of']) else row['part_of']
             q_id_categories[q_id] = tuple([inst, sub, part])
 
-
+# similar_lemmas_dict_filtered - temporary unused.
+# Assumsion that similar words have similar categories produced poor results, this should be modified to work.
 def label_data_with_wiki(meaningful_classes_filtered_squashed_sort, dict_form_lemma_str, class_labels, new_classes_mapping):
     class_id_tokens = {}
     class_extended_repeats = {}
@@ -574,25 +588,117 @@ def label_data_with_wiki(meaningful_classes_filtered_squashed_sort, dict_form_le
             class_extended_repeats[class_merged_id] = new_extended_set
     # load trained W2V model
     w2v_joined_model = Word2Vec.load('trained_node2vec_joined.model')
+    # cached_tokens = cache_tokens(similar_lemmas_dict_filtered, label_q_id, q_id_categories, remember_disambiguated_tokens, w2v_joined_model)
     class_id_labels = {}
     for class_id, search_tokens in class_extended_repeats.items():
         for search_token in search_tokens:
+            most_probable = []
+            # if search_token in cached_tokens:
+            #     most_probable = cached_tokens[search_token]
             if search_token in label_q_id.keys():
-                q_ids = list(label_q_id[search_token])
-                if len(q_ids) > 1:
-                    if search_token not in remember_disambiguated_tokens.keys():
-                        most_probable = disambiguate_entities(w2v_joined_model, q_id_categories, q_ids, search_token)
-                        remember_disambiguated_tokens[search_token] = most_probable
-                    else:
-                        most_probable = remember_disambiguated_tokens[search_token]
+                most_probable = assign_wikidata_category(search_token, label_q_id, q_id_categories, remember_disambiguated_tokens, w2v_joined_model)
+            if len(most_probable) > 0:
+                if class_id not in class_id_labels.keys():
+                    class_id_labels[class_id] = set(most_probable)
                 else:
-                    most_probable = pick_first_category(q_id_categories, q_ids[0])
-                if most_probable != EMPTY_STR:
-                    if class_id not in class_id_labels.keys():
-                        class_id_labels[class_id] = {most_probable}
-                    else:
-                        class_id_labels[class_id].add(most_probable)
+                    class_id_labels[class_id].update(most_probable)
     return class_id_labels, new_classid_label
+
+#  WRITE CACHED_TOKENS TO FILE
+# filename = 'n2v_word_wikidata_labels.txt'
+# try:
+#     with open(filename, 'w', encoding='utf-8') as filehandle:
+#         for word, labels_ in cached_tokens.items():
+#             filehandle.write("%s : %s\n" % (word, tuple(labels_)))
+# finally:
+#     filehandle.close()
+
+
+def write_labels_for_sentences_to_txt(trees_df_filtered, sent_labels_sorted):
+    count = 0
+    filename = 'sentences_labels.txt'
+    to_exclude = {'временная метка', 'событие'}
+    try:
+        with open(filename, 'w', encoding='utf-8') as filehandle:
+            for sent, labels_ in sent_labels_sorted.items():
+                labels_joined = COMMA.join(labels_)
+                if len(labels_ - to_exclude) > 0:
+                    initial_sent_text = list(trees_df_filtered.loc[trees_df_filtered.sent_name == sent].form)
+                    filehandle.write("\nМетки : %s\n" % labels_joined)
+                    filehandle.write("Предложение : %s\n" % SPACE.join(initial_sent_text))
+                    count += 1
+    finally:
+        filehandle.close()
+
+
+def write_labels_for_sentences_to_txt_500(trees_df_filtered, sent_labels_sorted):
+    selected = random.sample(list(sent_labels_sorted.keys()), 800)
+    count = 0
+    filename = 'sentences_labels_500.txt'
+    to_exclude = {'временная метка', 'событие'}
+    try:
+        with open(filename, 'w', encoding='utf-8') as filehandle:
+            for sent, labels_ in sent_labels_sorted.items():
+                labels_joined = COMMA.join(labels_)
+                if len(labels_ - to_exclude) > 0 and count < 500 and sent in selected:
+                    initial_sent_text = list(trees_df_filtered.loc[trees_df_filtered.sent_name == sent].form)
+                    filehandle.write("\nМетки : %s\n" % labels_joined)
+                    filehandle.write("Предложение : %s\n" % SPACE.join(initial_sent_text))
+                    count += 1
+    finally:
+        filehandle.close()
+
+
+def write_labels_for_sentences(trees_df_filtered, sent_labels_sorted):
+    # write all sentences
+    write_labels_for_sentences_to_txt(trees_df_filtered, sent_labels_sorted)
+    # write random 500 dentences (for quality evaluation)
+    write_labels_for_sentences_to_txt_500(trees_df_filtered, sent_labels_sorted)
+
+
+def assign_wikidata_category(search_token, label_q_id, q_id_categories, remember_disambiguated_tokens, w2v_joined_model):
+    q_ids = list(label_q_id[search_token])
+    if len(q_ids) > 1:
+        if search_token not in remember_disambiguated_tokens.keys():
+            most_probable = disambiguate_entities(w2v_joined_model, q_id_categories, q_ids, search_token)
+            remember_disambiguated_tokens[search_token] = most_probable
+        else:
+            most_probable = remember_disambiguated_tokens[search_token]
+    else:
+        most_probable = pick_first_category(q_id_categories, q_ids[0])
+    return most_probable
+
+
+def add_word_to_dict(word, word_wikidata_category, label_q_id, q_id_categories, remember_disambiguated_tokens, w2v_joined_model):
+    most_probable = assign_wikidata_category(word, label_q_id, q_id_categories, remember_disambiguated_tokens,
+                                             w2v_joined_model)
+    if word not in word_wikidata_category.keys():
+        word_wikidata_category[word] = set(most_probable)
+    else:
+        word_wikidata_category[word].update(most_probable)
+    return most_probable
+
+
+def cache_tokens(similar_lemmas_dict_filtered, label_q_id, q_id_categories, remember_disambiguated_tokens, w2v_joined_model):
+    word_wikidata_category = {}
+    for word, synonyms in similar_lemmas_dict_filtered.items():
+        if word in label_q_id.keys():
+            if word in label_q_id.keys():
+                add_word_to_dict(word, word_wikidata_category, label_q_id, q_id_categories, remember_disambiguated_tokens, w2v_joined_model)
+        for synonym in synonyms:
+            if synonym in label_q_id.keys():
+                most_probable = add_word_to_dict(synonym, word_wikidata_category, label_q_id, q_id_categories,
+                                 remember_disambiguated_tokens, w2v_joined_model)
+                if word not in word_wikidata_category.keys():
+                    word_wikidata_category[word] = set(most_probable)
+                else:
+                    word_wikidata_category[word].update(most_probable)
+    # merge categories for similar words
+    # for word, synonyms in similar_lemmas_dict_filtered.items():
+    #     for synonym in synonyms:
+    #         if word in word_wikidata_category.keys() and synonym in word_wikidata_category.keys():
+    #             word_wikidata_category[word].update(word_wikidata_category[synonym])
+    return word_wikidata_category
 
 
 def pick_first_category(q_id_categories, q_id):
@@ -600,7 +706,7 @@ def pick_first_category(q_id_categories, q_id):
     instance_of = categories[0]
     subclass_of = categories[1]
     part_of = categories[2]
-    most_probable = EMPTY_STR
+    most_probable = []
     if instance_of != EMPTY_STR:
         most_probable = get_russian_match(instance_of)
     elif subclass_of != EMPTY_STR:
@@ -615,10 +721,7 @@ def disambiguate_meanings(w2v_joined_model, possible_options, search_token):
     for possible_label in possible_options:
         possible_label = possible_label.strip()
         if possible_label in w2v_joined_model.wv.vocab:
-            try:
-                possible_labels_similarity_score[possible_label] = w2v_joined_model.wv.similarity(possible_label, search_token)
-            except KeyError as ke:
-                gg = []
+            possible_labels_similarity_score[possible_label] = w2v_joined_model.wv.similarity(possible_label, search_token)
     options_sorted = dict(sorted(possible_labels_similarity_score.items(), key=operator.itemgetter(1), reverse=True))
     if len(options_sorted) > 0:
         most_probable = next(iter(options_sorted))
@@ -631,17 +734,23 @@ def disambiguate_entities(w2v_joined_model, q_id_categories, q_ids, search_token
     possible_labels_similarity_score = {}
     for q_id in q_ids:
         possible_label = pick_first_category(q_id_categories, q_id)
-        if possible_label != EMPTY_STR and possible_label in w2v_joined_model.wv.vocab:
-            try:
-                possible_labels_similarity_score[possible_label] = w2v_joined_model.wv.similarity(possible_label, search_token)
-            except KeyError as ke:
-                gg = []
+        if len(possible_label) > 0 and all_labels_in_dict(possible_label, w2v_joined_model):
+            for label in possible_label:
+                    possible_labels_similarity_score[label] = w2v_joined_model.wv.similarity(label, search_token)
+
     options_sorted = dict(sorted(possible_labels_similarity_score.items(), key=operator.itemgetter(1), reverse=True))
     if len(options_sorted) > 0:
         most_probable = next(iter(options_sorted))
     else:
         most_probable = EMPTY_STR
-    return most_probable
+    return [most_probable]
+
+
+def all_labels_in_dict(possible_label, w2v_joined_model):
+    for label in possible_label:
+        if label not in w2v_joined_model.wv.vocab:
+            return False
+    return True
 
 
 # def get_all_wikidata_entities(label_getter):
@@ -700,10 +809,12 @@ def get_split_russian(entity):
 
 
 def get_russian_match(entity):
+    matches = []
     for tag in entity.split(COMMA):
         if has_russian_letters.match(tag):
-            return tag
-    return EMPTY_STR
+            matches.append(tag)
+            return matches
+    return matches
 
 
 def construct_db_tree(all_wikidata_entities):
@@ -819,6 +930,5 @@ def draw_db_network(db_tree_edges, edge_labels, all_db_labels):
 
     # node_positions = plot_instance.node_positions
     # edge_positions = plot_instance.edge_positions
-    gggg =[]
 
 
