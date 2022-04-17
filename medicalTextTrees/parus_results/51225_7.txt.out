@@ -1,0 +1,11 @@
+1	С	с	S	S	Sp-l	4	обст
+2	2005	@card@	M	M	Mc---d	3	опред
+3	года	год	N	N	Ncmsgn	1	предл
+4	отмечате	<unknown>	V	V	Vmip3s-m-e	0	ROOT
+5	повышение	повышение	N	N	Ncnsnn	4	предик
+6	АД	ад	N	N	Npfpgn	5	1-компл
+7	до	до	S	S	Sp-g	4	обст
+8	цифр	цифра	N	N	Ncfpgn	7	предл
+9	170\90	@card@	M	M	Mc---d	10	количест
+10	мм.рт.ст	мм.рт.ст	N	N	Ncmsnn	4	предик
+11	.	.	-	-	-	10	PUNC

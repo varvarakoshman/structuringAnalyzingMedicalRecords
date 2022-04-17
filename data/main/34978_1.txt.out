@@ -1,0 +1,6 @@
+1	Mensis	Mensis	-	-	-	6	предик
+2	с	с	S	S	Sp-l	6	вводн
+3	13	#число	M	M	Mc---d	4	количест
+4	лет	год	N	N	Ncmpgn	2	предл
+5	,	,	,	,	,	4	PUNC
+6	регулярные	регулярный	A	A	Afpmpnf	0	ROOT

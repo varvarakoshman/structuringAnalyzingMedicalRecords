@@ -1,9 +1,0 @@
-1	Отец	отец	N	N	Ncmsny	2	предик
-2	умер	умереть	V	V	Vmis-sma-e	0	ROOT
-3	от	от	S	S	Sp-g	2	1-компл
-4	3-го	#число	V	V	Vmpp-sma-eg	0	ROOT
-5	ИМ	они	P	P	P-3-pdn	4	1-компл
-6	в	в	S	S	Sp-l	4	обст
-7	возрасте	возраст	N	N	Ncmsln	6	предл
-8	58	#число	M	M	Mc---d	9	количест
-9	лет	год	N	N	Ncmpgn	7	компл-аппоз

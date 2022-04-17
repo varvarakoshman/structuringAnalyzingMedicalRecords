@@ -1,5 +1,0 @@
-1	ИБС	ибсти	N	N	Npmsnn	0	ROOT
-2	17	#число	M	M	Mc---d	0	ROOT
-3	июля	#месяц	N	N	Ncmsgn	2	атриб
-4	2010	#год	M	M	Mc---d	5	опред
-5	года	год	N	N	Ncmsgn	3	атриб

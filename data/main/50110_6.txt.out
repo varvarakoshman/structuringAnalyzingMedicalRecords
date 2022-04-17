@@ -1,0 +1,7 @@
+1	В	в	S	S	Sp-a	0	ROOT
+2	последние	последний	A	A	Afpmpaf	3	опред
+3	годы	год	N	N	Ncmpan	1	предл
+4	работает	работать	V	V	Vmip3s-a-p	0	ROOT
+5	в	в	S	S	Sp-l	4	обст
+6	службе	служба	N	N	Ncfsln	5	предл
+7	охраны	охрана	N	N	Ncfsgn	6	1-компл
